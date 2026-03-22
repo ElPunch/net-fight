@@ -56,16 +56,16 @@ WSGI_APPLICATION = 'fightnet.wsgi.application'
 
 # ──────────────────────────────────────────────
 # BASE DE DATOS – PostgreSQL
-# Cambia 'USER', 'PASSWORD' y 'NAME' según tu configuración local
+# Cambiar 'USER', 'PASSWORD' y 'NAME' según la configuración local
 # ──────────────────────────────────────────────
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'fightnet_db',       # nombre de tu base de datos
-        'USER': 'postgres',           # tu usuario de PostgreSQL
-        'PASSWORD': '4DMIN246#',       # tu contraseña
+        'NAME': 'fightnet_db',
+        'USER': 'postgres',
+        'PASSWORD': 'postgres',
         'HOST': 'localhost',
-        'PORT': '5433',
+        'PORT': '5432',
     }
 }
 
