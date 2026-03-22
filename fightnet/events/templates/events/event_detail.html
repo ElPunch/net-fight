@@ -1,0 +1,315 @@
+{% extends 'events/base.html' %}
+{% block title %}Fight.net – Detalle de Evento{% endblock %}
+
+{% block content %}
+<style>
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: .85rem;
+    font-weight: 600;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+    transition: color .2s;
+  }
+  .back-link:hover { color: var(--white); }
+
+  .detail-header {
+    margin-bottom: 2rem;
+  }
+  .detail-header h1 { font-size: 2.2rem; }
+  .detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.2rem;
+    margin-top: .8rem;
+    font-size: .9rem;
+    color: var(--muted);
+  }
+  .detail-meta span { display: flex; align-items: center; gap: .3rem; }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+  @media(max-width:700px){ .two-col { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.3rem;
+    letter-spacing: 1px;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+  .section-title span {
+    background: var(--red);
+    color: var(--white);
+    font-size: .7rem;
+    padding: .15rem .4rem;
+    border-radius: 2px;
+    vertical-align: middle;
+    font-family: 'Barlow', sans-serif;
+    font-weight: 700;
+  }
+
+  /* Asistentes */
+  .attendee-list { display: flex; flex-direction: column; gap: .5rem; }
+  .attendee-item {
+    background: #0f1115;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: .6rem .9rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: .88rem;
+  }
+  .check-badge {
+    font-size: .72rem;
+    padding: .15rem .5rem;
+    border-radius: 3px;
+    font-weight: 700;
+  }
+  .check-yes { background: #14532d; color: #4ade80; }
+  .check-no  { background: #1f2937; color: #9ca3af; }
+
+  /* Comentarios */
+  .comment-list { display: flex; flex-direction: column; gap: .7rem; margin-bottom: 1rem; }
+  .comment-item {
+    background: #0f1115;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: .7rem .9rem;
+  }
+  .comment-user {
+    font-size: .78rem;
+    color: var(--gold);
+    font-weight: 700;
+    margin-bottom: .3rem;
+  }
+  .comment-text { font-size: .9rem; line-height: 1.5; }
+  .comment-date { font-size: .72rem; color: var(--muted); margin-top: .3rem; }
+
+  /* Check-in QR */
+  .checkin-box {
+    margin-top: 1.5rem;
+  }
+  .qr-input-row {
+    display: flex;
+    gap: .6rem;
+  }
+  .qr-input-row input { flex: 1; }
+
+  /* Mi QR */
+  .my-qr-box {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: #0f1115;
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+    text-align: center;
+  }
+  .my-qr-box a {
+    color: var(--red);
+    font-weight: 700;
+    text-decoration: none;
+  }
+</style>
+
+<!-- Enlace de regreso -->
+<a href="/" class="back-link">← Volver a eventos</a>
+
+<!-- Spinner mientras carga -->
+<div id="loading"><div class="spinner"></div></div>
+<div id="content" style="display:none">
+
+  <!-- Header del evento -->
+  <div class="detail-header">
+    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+      <h1 id="ev-titulo">—</h1>
+      <span id="ev-estado" class="badge"></span>
+    </div>
+    <div class="detail-meta">
+      <span>📅 <span id="ev-fecha">—</span></span>
+      <span>📍 <span id="ev-ubicacion">—</span></span>
+      <span>👤 <span id="ev-creador">—</span></span>
+    </div>
+    <p id="ev-desc" style="margin-top:.8rem;font-size:.95rem;line-height:1.6;color:var(--muted)"></p>
+  </div>
+
+  <div class="two-col">
+
+    <!-- ── Asistentes ── -->
+    <div class="card">
+      <div class="section-title">Asistentes <span id="total-badge">0</span></div>
+      <div class="attendee-list" id="attendee-list">
+        <div class="text-muted text-center">Sin registros aún</div>
+      </div>
+
+      <!-- Check-in por QR (solo el creador o admin podrían usarlo; aquí lo dejamos visible para demostración) -->
+      <div class="checkin-box">
+        <hr class="divider">
+        <div class="section-title" style="font-size:1rem">Check-in por QR</div>
+        <div class="qr-input-row">
+          <input type="text" id="qr-input" placeholder="Pega el código QR aquí">
+          <button class="btn btn-primary btn-sm" id="btn-checkin">Validar</button>
+        </div>
+        <p id="checkin-result" class="text-muted mt-1" style="font-size:.82rem"></p>
+      </div>
+    </div>
+
+    <!-- ── Comentarios ── -->
+    <div class="card">
+      <div class="section-title">Comentarios</div>
+      <div class="comment-list" id="comment-list">
+        <div class="text-muted text-center">Sin comentarios aún</div>
+      </div>
+
+      <div class="form-group">
+        <textarea id="comment-input" rows="3" placeholder="Escribe un comentario..."></textarea>
+      </div>
+      <div style="text-align:right">
+        <button class="btn btn-primary btn-sm" id="btn-comment">Publicar</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Mi QR (si el usuario está registrado) -->
+  <div class="my-qr-box" id="my-qr-box" style="display:none">
+    🎫 Estás registrado en este evento. <a href="#" id="my-qr-link">Ver mi QR de acceso →</a>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Obtener ID del evento de la URL
+  const EVENT_ID = {{ event_id }};
+  let MY_REGISTRATION_ID = null;
+
+  // ─── Cargar datos del evento ──────────────────────────────────────────────
+  async function loadEvent() {
+    const res = await apiFetch(`/api/events/${EVENT_ID}/`);
+    document.getElementById('ev-titulo').textContent   = res.titulo;
+    document.getElementById('ev-fecha').textContent    = res.fecha;
+    document.getElementById('ev-ubicacion').textContent = res.ubicacion;
+    document.getElementById('ev-creador').textContent  = res.creador;
+    document.getElementById('ev-desc').textContent     = res.descripcion;
+    const badge = document.getElementById('ev-estado');
+    badge.textContent = res.estado;
+    badge.className   = `badge badge-${res.estado}`;
+  }
+
+  // ─── Cargar asistentes ────────────────────────────────────────────────────
+  async function loadAttendees() {
+    const res  = await apiFetch(`/api/event-attendees/${EVENT_ID}/`);
+    const list = document.getElementById('attendee-list');
+    document.getElementById('total-badge').textContent = res.total;
+
+    if (res.attendees.length === 0) {
+      list.innerHTML = '<div class="text-muted text-center">Sin registros aún</div>';
+      return;
+    }
+
+    list.innerHTML = res.attendees.map(a => `
+      <div class="attendee-item">
+        <span>${a.usuario}</span>
+        <span class="check-badge ${a.check_in ? 'check-yes' : 'check-no'}">
+          ${a.check_in ? '✓ Check-in' : 'Pendiente'}
+        </span>
+      </div>
+    `).join('');
+  }
+
+  // ─── Cargar comentarios ───────────────────────────────────────────────────
+  async function loadComments() {
+    const res  = await apiFetch(`/api/event-comments/${EVENT_ID}/`);
+    const list = document.getElementById('comment-list');
+
+    if (res.comments.length === 0) {
+      list.innerHTML = '<div class="text-muted text-center">Sin comentarios aún</div>';
+      return;
+    }
+
+    list.innerHTML = res.comments.map(c => `
+      <div class="comment-item">
+        <div class="comment-user">${c.usuario}</div>
+        <div class="comment-text">${c.contenido}</div>
+        <div class="comment-date">${c.fecha}</div>
+      </div>
+    `).join('');
+  }
+
+  // ─── Publicar comentario ──────────────────────────────────────────────────
+  document.getElementById('btn-comment').addEventListener('click', async () => {
+    const contenido = document.getElementById('comment-input').value.trim();
+    if (!contenido) { showToast('Escribe algo primero'); return; }
+
+    const res = await apiFetch(`/api/event-comments/${EVENT_ID}/`, 'POST', { contenido });
+    if (res.ok) {
+      document.getElementById('comment-input').value = '';
+      loadComments();
+    } else {
+      showToast(res.error || 'Error al publicar');
+    }
+  });
+
+  // ─── Check-in por QR ──────────────────────────────────────────────────────
+  document.getElementById('btn-checkin').addEventListener('click', async () => {
+    const codigo = document.getElementById('qr-input').value.trim();
+    if (!codigo) { showToast('Ingresa un código QR'); return; }
+
+    const res = await apiFetch('/api/check-in/', 'POST', { codigo_qr: codigo });
+    const result = document.getElementById('checkin-result');
+
+    if (res.ok) {
+      result.textContent = `✅ Check-in realizado: ${res.usuario} → ${res.evento}`;
+      result.style.color = '#4ade80';
+      document.getElementById('qr-input').value = '';
+      loadAttendees();
+    } else {
+      result.textContent = `❌ ${res.error}`;
+      result.style.color = 'var(--red)';
+    }
+  });
+
+  // ─── Verificar si el usuario ya está registrado ───────────────────────────
+  async function checkMyRegistration() {
+    // Buscamos en la lista de asistentes si el usuario actual aparece
+    const meRes = await apiFetch('/api/me/');
+    const attRes = await apiFetch(`/api/event-attendees/${EVENT_ID}/`);
+    const myReg = attRes.attendees.find(a => a.usuario === meRes.username);
+
+    if (myReg) {
+      // Necesitamos el ID del registro: lo obtenemos del cookie/session via registro reciente
+      // Mostramos un mensaje genérico; el link al QR requiere el ID de registro
+      document.getElementById('my-qr-box').style.display = 'block';
+      // El link al QR se redirige a la lista; el alumno puede ver el QR desde el admin
+      document.getElementById('my-qr-link').href = '#';
+      document.getElementById('my-qr-link').onclick = () => {
+        showToast('Para ver tu QR, busca tu registro en /admin/ o guarda el código al registrarte.', 'success');
+        return false;
+      };
+    }
+  }
+
+  // ─── Inicializar ──────────────────────────────────────────────────────────
+  async function init() {
+    await Promise.all([loadEvent(), loadAttendees(), loadComments(), checkMyRegistration()]);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+  }
+
+  init();
+</script>
+{% endblock %}
