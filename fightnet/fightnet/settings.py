@@ -63,7 +63,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'fightnet_db',
         'USER': 'postgres',
-        'PASSWORD': 'postgres',
+        'PASSWORD': 'mfdoom',
         'HOST': 'localhost',
         'PORT': '5432',
     }
