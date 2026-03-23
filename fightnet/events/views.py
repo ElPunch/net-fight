@@ -1,7 +1,6 @@
 """
-views.py – Vistas de Fight.net
-Todo con Function-Based Views (FBV) y respuestas JSON simples.
-Sin Django REST Framework: usamos JsonResponse directamente.
+views.py - Vistas de Fight.net
+FBV con JsonResponse. Sin Django REST Framework.
 """
 
 import uuid
@@ -15,20 +14,30 @@ from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
 from django.conf import settings
 
 from .models import Event, EventRegistration, Comment, UserProfile, EventCreationLog
 
 
 # ══════════════════════════════════════════════
-# VISTAS DE PÁGINA (renderizan HTML)
+# HELPER: obtener rol del usuario
 # ══════════════════════════════════════════════
 
+def get_rol(user):
+    """Devuelve el rol del usuario o 'fighter' por defecto."""
+    perfil = getattr(user, 'profile', None)
+    return perfil.rol if perfil else 'fighter'
+
+
+# ══════════════════════════════════════════════
+# VISTAS DE PAGINA
+# ══════════════════════════════════════════════
+
+@csrf_exempt
 def login_view(request):
-    """Página de inicio de sesión."""
+    """Login: redirige a /promotor/ o /peleador/ segun el rol."""
     if request.user.is_authenticated:
-        return redirect('index')
+        return _redirect_by_rol(request.user)
 
     if request.method == 'POST':
         data = json.loads(request.body)
@@ -37,23 +46,28 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user:
             login(request, user)
-            return JsonResponse({'ok': True})
+            rol = get_rol(user)
+            return JsonResponse({'ok': True, 'rol': rol})
         return JsonResponse({'ok': False, 'error': 'Credenciales incorrectas'}, status=400)
 
     return render(request, 'events/login.html')
 
 
+@csrf_exempt
 def register_view(request):
-    """Registro de nuevo usuario."""
+    """Registro: redirige segun rol tras crear la cuenta."""
     if request.user.is_authenticated:
-        return redirect('index')
+        return _redirect_by_rol(request.user)
 
     if request.method == 'POST':
-        data = json.loads(request.body)
+        data     = json.loads(request.body)
         username = data.get('username', '').strip()
         email    = data.get('email', '').strip()
         password = data.get('password', '')
         rol      = data.get('rol', 'fighter')
+
+        if rol not in ('fighter', 'promoter'):
+            rol = 'fighter'
 
         if User.objects.filter(username=username).exists():
             return JsonResponse({'ok': False, 'error': 'El usuario ya existe'}, status=400)
@@ -61,7 +75,7 @@ def register_view(request):
         user = User.objects.create_user(username=username, email=email, password=password)
         UserProfile.objects.create(user=user, rol=rol)
         login(request, user)
-        return JsonResponse({'ok': True})
+        return JsonResponse({'ok': True, 'rol': rol})
 
     return render(request, 'events/register.html')
 
@@ -71,10 +85,42 @@ def logout_view(request):
     return redirect('login')
 
 
+def _redirect_by_rol(user):
+    """Redirige al dashboard correspondiente segun el rol."""
+    rol = get_rol(user)
+    if rol == 'promoter':
+        return redirect('dashboard_promotor')
+    return redirect('dashboard_peleador')
+
+
 @login_required
 def index(request):
-    """Página principal con listado de eventos."""
-    return render(request, 'events/index.html')
+    """Redirige al dashboard correcto segun rol."""
+    return _redirect_by_rol(request.user)
+
+
+@login_required
+def dashboard_promotor(request):
+    """Dashboard exclusivo para promotores."""
+    if get_rol(request.user) != 'promoter':
+        return redirect('dashboard_peleador')
+    return render(request, 'events/index_promotor.html')
+
+
+@login_required
+def dashboard_peleador(request):
+    """Dashboard exclusivo para peleadores."""
+    if get_rol(request.user) != 'fighter':
+        return redirect('dashboard_promotor')
+    return render(request, 'events/index_peleador.html')
+
+
+@login_required
+def perfil_view(request):
+    """Pagina de edicion de perfil (solo peleadores)."""
+    if get_rol(request.user) != 'fighter':
+        return redirect('dashboard_promotor')
+    return render(request, 'events/perfil.html')
 
 
 @login_required
@@ -85,21 +131,17 @@ def event_detail(request, pk):
 
 @login_required
 def my_qr(request, registration_id):
-    """Página que muestra el QR del usuario para un evento."""
+    """Muestra el QR del usuario para un evento."""
     reg = get_object_or_404(EventRegistration, pk=registration_id, usuario=request.user)
     return render(request, 'events/my_qr.html', {'registration': reg})
 
 
 # ══════════════════════════════════════════════
-# API JSON – Eventos
+# API JSON - Eventos
 # ══════════════════════════════════════════════
 
 @login_required
 def api_events(request):
-    """
-    GET  /api/events/  → lista todos los eventos activos
-    POST /api/events/  → crea un nuevo evento
-    """
     if request.method == 'GET':
         events = Event.objects.filter(estado='activo').select_related('creador')
         data = [
@@ -117,27 +159,46 @@ def api_events(request):
         return JsonResponse({'events': data})
 
     if request.method == 'POST':
-        data = json.loads(request.body)
+        if get_rol(request.user) != 'promoter':
+            return JsonResponse({'error': 'Solo los promotores pueden crear eventos'}, status=403)
+
+        data  = json.loads(request.body)
         event = Event.objects.create(
             titulo      = data['titulo'],
             descripcion = data['descripcion'],
-            fecha       = data['fecha'],       # formato ISO: "2025-06-15T18:00"
+            fecha       = data['fecha'],
             ubicacion   = data['ubicacion'],
             creador     = request.user,
         )
-        # Creamos el log de auditoría automáticamente
         EventCreationLog.objects.create(evento=event, creador=request.user, estatus='aprobado')
         return JsonResponse({'ok': True, 'id': event.id}, status=201)
 
-    return JsonResponse({'error': 'Método no permitido'}, status=405)
+    return JsonResponse({'error': 'Metodo no permitido'}, status=405)
+
+
+@login_required
+def api_mis_eventos(request):
+    if get_rol(request.user) != 'promoter':
+        return JsonResponse({'error': 'Sin permiso'}, status=403)
+
+    events = Event.objects.filter(creador=request.user).order_by('-fecha_creacion')
+    data = [
+        {
+            'id':          e.id,
+            'titulo':      e.titulo,
+            'descripcion': e.descripcion,
+            'fecha':       e.fecha.strftime('%d/%m/%Y %H:%M'),
+            'ubicacion':   e.ubicacion,
+            'estado':      e.estado,
+            'total_registros': e.registros.count(),
+        }
+        for e in events
+    ]
+    return JsonResponse({'events': data})
 
 
 @login_required
 def api_event_detail(request, pk):
-    """
-    GET    /api/events/<pk>/  → detalle de un evento
-    DELETE /api/events/<pk>/  → elimina un evento (solo su creador o admin)
-    """
     event = get_object_or_404(Event, pk=pk)
 
     if request.method == 'GET':
@@ -157,15 +218,14 @@ def api_event_detail(request, pk):
         event.delete()
         return JsonResponse({'ok': True})
 
-    return JsonResponse({'error': 'Método no permitido'}, status=405)
+    return JsonResponse({'error': 'Metodo no permitido'}, status=405)
 
 
 # ══════════════════════════════════════════════
-# API JSON – Registro a eventos
+# API JSON - Registro a eventos
 # ══════════════════════════════════════════════
 
 def _generar_qr(codigo, filename):
-    """Función auxiliar: genera imagen QR y la guarda en MEDIA_ROOT/qrcodes/."""
     qr = qrcode.QRCode(version=1, box_size=10, border=4)
     qr.add_data(codigo)
     qr.make(fit=True)
@@ -181,23 +241,20 @@ def _generar_qr(codigo, filename):
 
 @login_required
 def api_register_event(request):
-    """
-    POST /api/register-event/
-    Body: { "evento_id": 1 }
-    Crea un registro y genera el QR.
-    """
     if request.method != 'POST':
-        return JsonResponse({'error': 'Método no permitido'}, status=405)
+        return JsonResponse({'error': 'Metodo no permitido'}, status=405)
 
-    data     = json.loads(request.body)
-    event    = get_object_or_404(Event, pk=data['evento_id'])
+    if get_rol(request.user) == 'promoter':
+        return JsonResponse({'error': 'Los promotores no pueden registrarse como asistentes'}, status=403)
+
+    data  = json.loads(request.body)
+    event = get_object_or_404(Event, pk=data['evento_id'])
 
     if EventRegistration.objects.filter(usuario=request.user, evento=event).exists():
-        return JsonResponse({'ok': False, 'error': 'Ya estás registrado en este evento'}, status=400)
+        return JsonResponse({'ok': False, 'error': 'Ya estas registrado en este evento'}, status=400)
 
-    # Código único para el QR
-    codigo = str(uuid.uuid4())
-    filename = f'{codigo}.png'
+    codigo      = str(uuid.uuid4())
+    filename    = f'{codigo}.png'
     ruta_imagen = _generar_qr(codigo, filename)
 
     reg = EventRegistration.objects.create(
@@ -211,11 +268,7 @@ def api_register_event(request):
 
 @login_required
 def api_attendees(request, pk):
-    """
-    GET /api/event-attendees/<pk>/
-    Devuelve la lista de asistentes de un evento.
-    """
-    event = get_object_or_404(Event, pk=pk)
+    event     = get_object_or_404(Event, pk=pk)
     registros = EventRegistration.objects.filter(evento=event).select_related('usuario')
     data = [
         {
@@ -228,25 +281,30 @@ def api_attendees(request, pk):
     return JsonResponse({'attendees': data, 'total': len(data)})
 
 
+@login_required
+def api_my_registration(request, pk):
+    try:
+        reg = EventRegistration.objects.get(usuario=request.user, evento_id=pk)
+        return JsonResponse({'registered': True, 'registration_id': reg.id, 'codigo_qr': reg.codigo_qr})
+    except EventRegistration.DoesNotExist:
+        return JsonResponse({'registered': False})
+
+
 # ══════════════════════════════════════════════
-# API JSON – Comentarios
+# API JSON - Comentarios
 # ══════════════════════════════════════════════
 
 @login_required
 def api_comments(request, pk):
-    """
-    GET  /api/event-comments/<pk>/  → lista comentarios
-    POST /api/event-comment/<pk>/   → agrega comentario
-    """
     event = get_object_or_404(Event, pk=pk)
 
     if request.method == 'GET':
         comments = Comment.objects.filter(evento=event).select_related('usuario')
         data = [
             {
-                'usuario': c.usuario.username,
+                'usuario':   c.usuario.username,
                 'contenido': c.contenido,
-                'fecha': c.fecha_comentario.strftime('%d/%m/%Y %H:%M'),
+                'fecha':     c.fecha_comentario.strftime('%d/%m/%Y %H:%M'),
             }
             for c in comments
         ]
@@ -255,29 +313,23 @@ def api_comments(request, pk):
     if request.method == 'POST':
         data = json.loads(request.body)
         Comment.objects.create(
-            evento   = event,
-            usuario  = request.user,
+            evento    = event,
+            usuario   = request.user,
             contenido = data['contenido'],
         )
         return JsonResponse({'ok': True}, status=201)
 
-    return JsonResponse({'error': 'Método no permitido'}, status=405)
+    return JsonResponse({'error': 'Metodo no permitido'}, status=405)
 
 
 # ══════════════════════════════════════════════
-# API JSON – Check-in por QR
+# API JSON - Check-in por QR
 # ══════════════════════════════════════════════
 
 @login_required
 def api_checkin(request):
-    """
-    POST /api/check-in/
-    Body: { "codigo_qr": "<uuid>" }
-    Valida el código QR y marca check_in = True.
-    Solo el creador del evento o staff pueden hacer check-in.
-    """
     if request.method != 'POST':
-        return JsonResponse({'error': 'Método no permitido'}, status=405)
+        return JsonResponse({'error': 'Metodo no permitido'}, status=405)
 
     data   = json.loads(request.body)
     codigo = data.get('codigo_qr', '')
@@ -285,10 +337,13 @@ def api_checkin(request):
     try:
         reg = EventRegistration.objects.select_related('evento', 'usuario').get(codigo_qr=codigo)
     except EventRegistration.DoesNotExist:
-        return JsonResponse({'ok': False, 'error': 'Código QR inválido'}, status=404)
+        return JsonResponse({'ok': False, 'error': 'Codigo QR invalido'}, status=404)
+
+    if reg.evento.creador != request.user and not request.user.is_staff:
+        return JsonResponse({'ok': False, 'error': 'Solo el promotor del evento puede hacer check-in'}, status=403)
 
     if reg.check_in:
-        return JsonResponse({'ok': False, 'error': 'Ya se realizó el check-in'}, status=400)
+        return JsonResponse({'ok': False, 'error': 'Ya se realizo el check-in'}, status=400)
 
     reg.check_in = True
     reg.estado   = 'confirmado'
@@ -302,15 +357,37 @@ def api_checkin(request):
 
 
 # ══════════════════════════════════════════════
-# API – Info del usuario actual
+# API - Info y edicion del usuario actual
 # ══════════════════════════════════════════════
 
 @login_required
 def api_me(request):
-    """Devuelve datos básicos del usuario autenticado."""
     perfil = getattr(request.user, 'profile', None)
-    return JsonResponse({
-        'username': request.user.username,
-        'email':    request.user.email,
-        'rol':      perfil.rol if perfil else 'fighter',
-    })
+
+    if request.method == 'GET':
+        return JsonResponse({
+            'username': request.user.username,
+            'email':    request.user.email,
+            'rol':      perfil.rol if perfil else 'fighter',
+            'bio':      perfil.bio if perfil else '',
+        })
+
+    if request.method == 'POST':
+        if get_rol(request.user) != 'fighter':
+            return JsonResponse({'error': 'Solo los peleadores pueden editar su perfil'}, status=403)
+
+        data  = json.loads(request.body)
+        email = data.get('email', '').strip()
+        bio   = data.get('bio', '').strip()
+
+        if email:
+            request.user.email = email
+            request.user.save()
+
+        if perfil:
+            perfil.bio = bio
+            perfil.save()
+
+        return JsonResponse({'ok': True})
+
+    return JsonResponse({'error': 'Metodo no permitido'}, status=405)
