@@ -1,0 +1,86 @@
+{% extends 'events/base.html' %}
+{% block title %}Fight.net – Mi QR{% endblock %}
+
+{% block content %}
+<style>
+  .qr-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    min-height: calc(100vh - 160px);
+  }
+  .qr-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--red);
+    border-radius: 8px;
+    padding: 2.5rem;
+    text-align: center;
+    max-width: 380px;
+    width: 100%;
+  }
+  .qr-card h2 { margin-bottom: .3rem; }
+  .qr-card .evento-name {
+    color: var(--muted);
+    font-size: .9rem;
+    margin-bottom: 1.5rem;
+  }
+  .qr-img {
+    background: white;
+    border-radius: 6px;
+    padding: 1rem;
+    display: inline-block;
+    margin-bottom: 1.2rem;
+  }
+  .qr-img img { display: block; width: 200px; height: 200px; }
+  .qr-code-text {
+    font-family: monospace;
+    font-size: .72rem;
+    color: var(--muted);
+    word-break: break-all;
+    margin-bottom: 1.2rem;
+  }
+  .status-badge {
+    display: inline-block;
+    padding: .4rem 1rem;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: .82rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 1.5rem;
+  }
+  .status-ok    { background: #14532d; color: #4ade80; }
+  .status-done  { background: #1e1a05; color: var(--gold); }
+</style>
+
+<div class="qr-page">
+  <div class="qr-card">
+    <h2>Tu pase de acceso</h2>
+    <p class="evento-name">{{ registration.evento.titulo }}</p>
+
+    {% if registration.imagen_qr %}
+      <div class="qr-img">
+        <img src="{{ registration.imagen_qr.url }}" alt="QR de acceso">
+      </div>
+    {% else %}
+      <p style="color:var(--muted);margin-bottom:1.5rem">QR no disponible. Muestra el código:</p>
+    {% endif %}
+
+    <div class="qr-code-text">{{ registration.codigo_qr }}</div>
+
+    {% if registration.check_in %}
+      <div class="status-badge status-done">✓ Check-in realizado</div>
+    {% else %}
+      <div class="status-badge status-ok">Pendiente de check-in</div>
+    {% endif %}
+
+    <div style="font-size:.8rem;color:var(--muted);margin-bottom:1.2rem">
+      Registrado el {{ registration.fecha_registro|date:"d/m/Y H:i" }}
+    </div>
+
+    <a href="/" class="btn btn-outline" style="width:100%">← Volver a eventos</a>
+  </div>
+</div>
+{% endblock %}

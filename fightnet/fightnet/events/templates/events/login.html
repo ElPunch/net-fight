@@ -1,0 +1,83 @@
+{% extends 'events/base.html' %}
+{% block title %}Fight.net – Ingresar{% endblock %}
+
+{% block content %}
+<style>
+  .auth-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 100px);
+  }
+  .auth-box {
+    width: 100%;
+    max-width: 400px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--red);
+    border-radius: 8px;
+    padding: 2.5rem 2rem;
+  }
+  .auth-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    text-align: center;
+    margin-bottom: 1.8rem;
+    letter-spacing: 2px;
+  }
+  .auth-title span { color: var(--red); }
+  .auth-footer {
+    text-align: center;
+    margin-top: 1.2rem;
+    font-size: .85rem;
+    color: var(--muted);
+  }
+  .auth-footer a { color: var(--red); text-decoration: none; font-weight: 600; }
+</style>
+
+<div class="auth-wrap">
+  <div class="auth-box">
+    <div class="auth-title">Fight<span>.</span>net</div>
+
+    <div class="form-group">
+      <label>Usuario</label>
+      <input type="text" id="username" placeholder="tu_usuario" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>Contraseña</label>
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+
+    <button class="btn btn-primary" style="width:100%;margin-top:.5rem" id="btn-login">
+      Ingresar
+    </button>
+
+    <div class="auth-footer">
+      ¿No tienes cuenta? <a href="/register/">Regístrate aquí</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.getElementById('btn-login').addEventListener('click', async () => {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+
+    if (!username || !password) { showToast('Completa todos los campos'); return; }
+
+    const res = await apiFetch('/login/', 'POST', { username, password });
+    if (res.ok) {
+      window.location.href = '/';
+    } else {
+      showToast(res.error || 'Error al iniciar sesión');
+    }
+  });
+
+  // Permitir Enter en inputs
+  document.getElementById('password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('btn-login').click();
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,244 @@
+{% extends 'events/base.html' %}
+{% block title %}Fight.net – Panel Promotor{% endblock %}
+
+{% block content %}
+<style>
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 1.5rem;
+  }
+  .page-header h1 { font-size: 2rem; }
+  .page-header p  { color: var(--muted); font-size: .9rem; margin-top: .2rem; }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.2rem;
+    text-align: center;
+  }
+  .stat-card .stat-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.5rem;
+    color: var(--red);
+    line-height: 1;
+  }
+  .stat-card .stat-label {
+    font-size: .78rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-top: .3rem;
+  }
+
+  .checkin-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--gold);
+    border-radius: 6px;
+    padding: 1.2rem 1.5rem;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    flex-wrap: wrap;
+  }
+  .checkin-section .checkin-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 1px;
+    color: var(--gold);
+    white-space: nowrap;
+  }
+  .checkin-section input { max-width: 320px; }
+  .checkin-result {
+    font-size: .85rem;
+    margin-top: .4rem;
+    min-height: 1.2rem;
+  }
+</style>
+
+<div class="page-header">
+  <div>
+    <h1>Panel del Promotor</h1>
+    <p id="eventos-count">Cargando tus eventos...</p>
+  </div>
+  <button class="btn btn-primary" id="btn-open-modal">+ Crear evento</button>
+</div>
+
+<!-- Check-in rapido por QR -->
+<div class="checkin-section">
+  <span class="checkin-label">⚡ Check-in QR</span>
+  <div style="flex:1;min-width:200px">
+    <div style="display:flex;gap:.6rem">
+      <input type="text" id="qr-input" placeholder="Pega el codigo QR del asistente">
+      <button class="btn btn-primary btn-sm" id="btn-checkin" style="white-space:nowrap">Validar</button>
+    </div>
+    <p class="checkin-result text-muted" id="checkin-result"></p>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="stats-row" id="stats-row" style="display:none">
+  <div class="stat-card">
+    <div class="stat-num" id="stat-total">0</div>
+    <div class="stat-label">Eventos creados</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" id="stat-asistentes">0</div>
+    <div class="stat-label">Total registros</div>
+  </div>
+</div>
+
+<!-- Grid de eventos del promotor -->
+<div class="events-grid" id="events-grid">
+  <div class="spinner"></div>
+</div>
+
+<!-- Modal crear evento -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <button class="modal-close" id="btn-close-modal">✕</button>
+    <h2>Nuevo Evento</h2>
+    <div class="form-group">
+      <label>Titulo del evento</label>
+      <input type="text" id="ev-titulo" placeholder="Ej: Noche de MMA – Guadalajara">
+    </div>
+    <div class="form-group">
+      <label>Descripcion</label>
+      <textarea id="ev-desc" rows="3" placeholder="Describe el evento..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Fecha y hora</label>
+      <input type="datetime-local" id="ev-fecha">
+    </div>
+    <div class="form-group">
+      <label>Ubicacion</label>
+      <input type="text" id="ev-ubicacion" placeholder="Ej: Arena VFG, Guadalajara">
+    </div>
+    <div style="display:flex;gap:.8rem;justify-content:flex-end;margin-top:.5rem">
+      <button class="btn btn-outline" id="btn-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="btn-crear">Crear evento</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  async function loadMisEventos() {
+    const grid = document.getElementById('events-grid');
+    const res  = await apiFetch('/api/mis-eventos/');
+    const events = res.events || [];
+
+    document.getElementById('eventos-count').textContent =
+      `${events.length} evento${events.length !== 1 ? 's' : ''} creado${events.length !== 1 ? 's' : ''}`;
+
+    const totalRegistros = events.reduce((acc, e) => acc + (e.total_registros || 0), 0);
+    document.getElementById('stat-total').textContent = events.length;
+    document.getElementById('stat-asistentes').textContent = totalRegistros;
+    document.getElementById('stats-row').style.display = 'grid';
+
+    if (events.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-state" style="grid-column:1/-1">
+          <div class="icon">🥊</div>
+          <p>Aun no has creado ningun evento.</p>
+          <p class="mt-1">¡Crea el primero con el boton de arriba!</p>
+        </div>`;
+      return;
+    }
+
+    grid.innerHTML = events.map(e => `
+      <div class="event-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <h3>${e.titulo}</h3>
+          <span class="badge badge-${e.estado}">${e.estado}</span>
+        </div>
+        <p style="font-size:.88rem;color:var(--muted);line-height:1.5">
+          ${e.descripcion.substring(0,100)}${e.descripcion.length > 100 ? '…' : ''}
+        </p>
+        <div class="meta">
+          <span>📅 ${e.fecha}</span>
+          <span>📍 ${e.ubicacion}</span>
+          <span>👥 ${e.total_registros} registrado${e.total_registros !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="actions">
+          <a href="/events/${e.id}/" class="btn btn-outline btn-sm">Ver detalle</a>
+          <button class="btn btn-danger btn-sm" onclick="eliminarEvento(${e.id}, this)">Eliminar</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function eliminarEvento(id, btn) {
+    if (!confirm('¿Seguro que deseas eliminar este evento?')) return;
+    btn.disabled = true;
+    const res = await apiFetch(`/api/events/${id}/`, 'DELETE');
+    if (res.ok) {
+      showToast('Evento eliminado', 'success');
+      loadMisEventos();
+    } else {
+      showToast(res.error || 'Error al eliminar');
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById('btn-checkin').addEventListener('click', async () => {
+    const codigo = document.getElementById('qr-input').value.trim();
+    if (!codigo) { showToast('Ingresa un codigo QR'); return; }
+    const res    = await apiFetch('/api/check-in/', 'POST', { codigo_qr: codigo });
+    const result = document.getElementById('checkin-result');
+    if (res.ok) {
+      result.textContent = `✅ Check-in: ${res.usuario} → ${res.evento}`;
+      result.style.color = '#4ade80';
+      document.getElementById('qr-input').value = '';
+      showToast(`Check-in realizado: ${res.usuario}`, 'success');
+    } else {
+      result.textContent = `❌ ${res.error}`;
+      result.style.color = 'var(--red)';
+    }
+  });
+
+  const modal = document.getElementById('modal');
+  document.getElementById('btn-open-modal').addEventListener('click',  () => modal.classList.add('open'));
+  document.getElementById('btn-close-modal').addEventListener('click', () => modal.classList.remove('open'));
+  document.getElementById('btn-cancel').addEventListener('click',      () => modal.classList.remove('open'));
+  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+
+  document.getElementById('btn-crear').addEventListener('click', async () => {
+    const titulo      = document.getElementById('ev-titulo').value.trim();
+    const descripcion = document.getElementById('ev-desc').value.trim();
+    const fecha       = document.getElementById('ev-fecha').value;
+    const ubicacion   = document.getElementById('ev-ubicacion').value.trim();
+
+    if (!titulo || !descripcion || !fecha || !ubicacion) {
+      showToast('Completa todos los campos');
+      return;
+    }
+
+    const res = await apiFetch('/api/events/', 'POST', { titulo, descripcion, fecha, ubicacion });
+    if (res.ok) {
+      showToast('Evento creado correctamente', 'success');
+      modal.classList.remove('open');
+      ['ev-titulo','ev-desc','ev-fecha','ev-ubicacion'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      loadMisEventos();
+    } else {
+      showToast(res.error || 'Error al crear evento');
+    }
+  });
+
+  loadMisEventos();
+</script>
+{% endblock %}
