@@ -1,0 +1,196 @@
+{% extends 'events/base.html' %}
+{% block title %}Fight.net – Eventos{% endblock %}
+
+{% block content %}
+<style>
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 1.5rem;
+  }
+  .page-header h1 { font-size: 2rem; }
+  .page-header p  { color: var(--muted); font-size: .9rem; margin-top: .2rem; }
+
+  /* Modal crear evento */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.75);
+    z-index: 200;
+    justify-content: center;
+    align-items: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--red);
+    border-radius: 8px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 500px;
+    position: relative;
+  }
+  .modal h2 { margin-bottom: 1.2rem; font-size: 1.5rem; }
+  .modal-close {
+    position: absolute; top: 1rem; right: 1rem;
+    background: none; border: none;
+    color: var(--muted); font-size: 1.4rem; cursor: pointer;
+  }
+
+  /* Tarjeta de evento vacío */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 1rem;
+    color: var(--muted);
+  }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+</style>
+
+<div class="page-header">
+  <div>
+    <h1>Próximos Eventos</h1>
+    <p id="event-count">Cargando eventos...</p>
+  </div>
+  <button class="btn btn-primary" id="btn-open-modal">+ Crear evento</button>
+</div>
+
+<!-- Grid de eventos -->
+<div class="events-grid" id="events-grid">
+  <div class="spinner"></div>
+</div>
+
+<!-- Modal crear evento -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <button class="modal-close" id="btn-close-modal">✕</button>
+    <h2>Nuevo Evento</h2>
+
+    <div class="form-group">
+      <label>Título del evento</label>
+      <input type="text" id="ev-titulo" placeholder="Ej: Noche de MMA – Guadalajara">
+    </div>
+    <div class="form-group">
+      <label>Descripción</label>
+      <textarea id="ev-desc" rows="3" placeholder="Describe el evento..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Fecha y hora</label>
+      <input type="datetime-local" id="ev-fecha">
+    </div>
+    <div class="form-group">
+      <label>Ubicación</label>
+      <input type="text" id="ev-ubicacion" placeholder="Ej: Arena VFG, Guadalajara">
+    </div>
+
+    <div style="display:flex;gap:.8rem;justify-content:flex-end;margin-top:.5rem">
+      <button class="btn btn-outline" id="btn-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="btn-crear">Crear evento</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // ─── Cargar eventos ───────────────────────────────────────────────────────
+  async function loadEvents() {
+    const grid = document.getElementById('events-grid');
+    const res  = await apiFetch('/api/events/');
+    const events = res.events || [];
+
+    document.getElementById('event-count').textContent =
+      `${events.length} evento${events.length !== 1 ? 's' : ''} disponible${events.length !== 1 ? 's' : ''}`;
+
+    if (events.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-state" style="grid-column:1/-1">
+          <div class="icon">🥊</div>
+          <p>No hay eventos por el momento.</p>
+          <p class="mt-1">¡Crea el primero!</p>
+        </div>`;
+      return;
+    }
+
+    grid.innerHTML = events.map(e => `
+      <div class="event-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <h3>${e.titulo}</h3>
+          <span class="badge badge-${e.estado}">${e.estado}</span>
+        </div>
+        <p style="font-size:.88rem;color:var(--muted);line-height:1.5">${e.descripcion.substring(0,100)}${e.descripcion.length > 100 ? '…' : ''}</p>
+        <div class="meta">
+          <span>📅 ${e.fecha}</span>
+          <span>📍 ${e.ubicacion}</span>
+          <span>👤 ${e.creador}</span>
+        </div>
+        <div class="actions">
+          <a href="/events/${e.id}/" class="btn btn-outline btn-sm">Ver detalle</a>
+          <button class="btn btn-primary btn-sm" onclick="registrarme(${e.id}, this)">Registrarme</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ─── Registrarse a un evento ──────────────────────────────────────────────
+  async function registrarme(eventoId, btn) {
+    btn.disabled = true;
+    btn.textContent = '...';
+    const res = await apiFetch('/api/register-event/', 'POST', { evento_id: eventoId });
+    if (res.ok) {
+      showToast('✅ ¡Registro exitoso! Revisa tu QR en el detalle del evento.', 'success');
+      loadEvents();
+    } else {
+      showToast(res.error || 'Error al registrarse');
+      btn.disabled = false;
+      btn.textContent = 'Registrarme';
+    }
+  }
+
+  // ─── Modal ────────────────────────────────────────────────────────────────
+  const modal   = document.getElementById('modal');
+  const openBtn = document.getElementById('btn-open-modal');
+  const closeBtn = document.getElementById('btn-close-modal');
+  const cancelBtn = document.getElementById('btn-cancel');
+
+  openBtn.addEventListener('click',  () => modal.classList.add('open'));
+  closeBtn.addEventListener('click', () => modal.classList.remove('open'));
+  cancelBtn.addEventListener('click',() => modal.classList.remove('open'));
+
+  // Cerrar al hacer clic fuera del modal
+  modal.addEventListener('click', e => {
+    if (e.target === modal) modal.classList.remove('open');
+  });
+
+  // ─── Crear evento ─────────────────────────────────────────────────────────
+  document.getElementById('btn-crear').addEventListener('click', async () => {
+    const titulo    = document.getElementById('ev-titulo').value.trim();
+    const descripcion = document.getElementById('ev-desc').value.trim();
+    const fecha     = document.getElementById('ev-fecha').value;
+    const ubicacion = document.getElementById('ev-ubicacion').value.trim();
+
+    if (!titulo || !descripcion || !fecha || !ubicacion) {
+      showToast('Completa todos los campos del evento');
+      return;
+    }
+
+    const res = await apiFetch('/api/events/', 'POST', { titulo, descripcion, fecha, ubicacion });
+    if (res.ok) {
+      showToast('✅ Evento creado correctamente', 'success');
+      modal.classList.remove('open');
+      // Limpiar formulario
+      ['ev-titulo','ev-desc','ev-fecha','ev-ubicacion'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      loadEvents();
+    } else {
+      showToast(res.error || 'Error al crear evento');
+    }
+  });
+
+  // ─── Iniciar ──────────────────────────────────────────────────────────────
+  loadEvents();
+</script>
+{% endblock %}
