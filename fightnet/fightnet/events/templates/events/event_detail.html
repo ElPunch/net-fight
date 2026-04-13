@@ -67,6 +67,29 @@
     align-items: center;
     font-size: .88rem;
   }
+  .attendee-info {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+  }
+  .attendee-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--red-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .8rem;
+    font-weight: 700;
+    color: var(--white);
+    overflow: hidden;
+  }
+  .attendee-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
   .check-badge {
     font-size: .72rem;
     padding: .15rem .5rem;
@@ -197,14 +220,21 @@
       return;
     }
 
-    list.innerHTML = res.attendees.map(a => `
-      <div class="attendee-item">
-        <span>${a.usuario}</span>
-        <span class="check-badge ${a.check_in ? 'check-yes' : 'check-no'}">
-          ${a.check_in ? '✓ Check-in' : 'Pendiente'}
-        </span>
-      </div>
-    `).join('');
+    list.innerHTML = res.attendees.map(a => {
+      const initial = a.usuario.charAt(0).toUpperCase();
+      const imgHtml = a.foto ? `<img src="${a.foto}" alt="${a.usuario}">` : initial;
+      return `
+        <div class="attendee-item">
+          <div class="attendee-info">
+            <div class="attendee-avatar">${imgHtml}</div>
+            <span>${a.usuario}</span>
+          </div>
+          <span class="check-badge ${a.check_in ? 'check-yes' : 'check-no'}">
+            ${a.check_in ? '✓ Check-in' : 'Pendiente'}
+          </span>
+        </div>
+      `;
+    }).join('');
   }
 
   async function loadComments() {

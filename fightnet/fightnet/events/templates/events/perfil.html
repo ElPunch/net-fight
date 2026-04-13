@@ -4,7 +4,7 @@
 {% block content %}
 <style>
   .perfil-wrapper {
-    max-width: 560px;
+    max-width: 600px;
     margin: 0 auto;
   }
   .perfil-header {
@@ -13,20 +13,53 @@
   .perfil-header h1 { font-size: 2rem; }
   .perfil-header p  { color: var(--muted); font-size: .9rem; margin-top: .3rem; }
 
+  .avatar-section {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    margin-bottom: 1.5rem;
+  }
   .avatar {
-    width: 72px;
-    height: 72px;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
     background: var(--red-dark);
     display: flex;
     align-items: center;
     justify-content: center;
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 2rem;
+    font-size: 2.2rem;
     color: var(--white);
-    margin-bottom: 1.2rem;
-    border: 2px solid var(--red);
+    border: 3px solid var(--red);
+    overflow: hidden;
   }
+  .avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .upload-btn {
+    padding: .5rem 1rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--muted);
+    font-size: .85rem;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .upload-btn:hover {
+    border-color: var(--red);
+    color: var(--white);
+  }
+  #id_foto { display: none; }
 
   .info-readonly {
     background: #0f1115;
@@ -47,6 +80,12 @@
     margin: 1.5rem 0 1rem;
     padding-bottom: .4rem;
     border-bottom: 1px solid var(--border);
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
   }
 
   .back-link {
@@ -71,14 +110,22 @@
   <div id="loading"><div class="spinner"></div></div>
 
   <div id="perfil-content" style="display:none">
-    <div class="avatar" id="avatar-inicial">?</div>
+    <div class="avatar-section">
+      <div class="avatar" id="avatar-container">
+        <div class="avatar-placeholder" id="avatar-placeholder">?</div>
+      </div>
+      <div>
+        <label for="id_foto" class="upload-btn">Cambiar foto de perfil</label>
+        <input type="file" id="id_foto" accept="image/*">
+      </div>
+    </div>
 
     <div class="perfil-header">
       <h1>Mi Perfil</h1>
-      <p>Actualiza tu informacion personal</p>
+      <p>Actualiza tu información personal</p>
     </div>
 
-    <div class="section-divider">Informacion de cuenta</div>
+    <div class="section-divider">Información de cuenta</div>
     <div class="form-group">
       <label>Usuario</label>
       <div class="info-readonly" id="info-username">—</div>
@@ -88,14 +135,37 @@
       <div class="info-readonly">Peleador</div>
     </div>
 
-    <div class="section-divider">Datos editables</div>
+    <div class="section-divider">Datos personales</div>
+    <div class="two-col">
+      <div class="form-group">
+        <label>Peso (kg)</label>
+        <input type="number" id="input-peso" step="0.01" placeholder="70.5">
+      </div>
+      <div class="form-group">
+        <label>Edad</label>
+        <input type="number" id="input-edad" min="1" max="100" placeholder="25">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Disciplina</label>
+      <select id="input-disciplina">
+        <option value="">Selecciona una disciplina</option>
+        <option value="boxeo">Boxeo</option>
+        <option value="jiujitsu">Jiu-Jitsu</option>
+        <option value="kickboxing">Kickboxing</option>
+        <option value="mma">MMA</option>
+        <option value="otro">Otro</option>
+      </select>
+    </div>
+
+    <div class="section-divider">Información adicional</div>
     <div class="form-group">
       <label>Email</label>
       <input type="email" id="input-email" placeholder="tu@email.com">
     </div>
     <div class="form-group">
       <label>Bio</label>
-      <textarea id="input-bio" rows="4" placeholder="Cuentanos sobre ti: peso, categoria, estilo de pelea..."></textarea>
+      <textarea id="input-bio" rows="4" placeholder="Cuéntanos sobre ti: peso, categoría, estilo de pelea..."></textarea>
     </div>
 
     <div style="display:flex;justify-content:flex-end;margin-top:1.2rem">
@@ -108,28 +178,79 @@
 
 {% block scripts %}
 <script>
+  let currentFoto = null;
+
   async function loadPerfil() {
     const res = await apiFetch('/api/me/');
 
     document.getElementById('info-username').textContent = res.username;
     document.getElementById('input-email').value         = res.email || '';
     document.getElementById('input-bio').value           = res.bio   || '';
-    document.getElementById('avatar-inicial').textContent =
-      res.username.charAt(0).toUpperCase();
+    document.getElementById('input-peso').value           = res.peso  || '';
+    document.getElementById('input-edad').value          = res.edad  || '';
+    document.getElementById('input-disciplina').value    = res.disciplina || '';
+    
+    currentFoto = res.foto;
+    if (res.foto) {
+      document.getElementById('avatar-placeholder').innerHTML = `<img src="${res.foto}" alt="Foto de perfil">`;
+    } else {
+      document.getElementById('avatar-placeholder').textContent = res.username.charAt(0).toUpperCase();
+    }
 
     document.getElementById('loading').style.display        = 'none';
     document.getElementById('perfil-content').style.display = 'block';
   }
 
+  document.getElementById('id_foto').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('foto', file);
+
+    document.getElementById('btn-guardar').textContent = 'Subiendo...';
+    document.getElementById('btn-guardar').disabled = true;
+
+    try {
+      const token = getCookie('csrftoken');
+      const resp = await fetch('/api/me/upload-foto/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': token },
+        body: formData
+      });
+      const data = await resp.json();
+      if (data.ok && data.foto) {
+        currentFoto = data.foto;
+        document.getElementById('avatar-placeholder').innerHTML = `<img src="${data.foto}" alt="Foto de perfil">`;
+        showToast('Foto actualizada', 'success');
+      } else {
+        showToast(data.error || 'Error al subir foto');
+      }
+    } catch (err) {
+      showToast('Error al subir foto');
+    }
+
+    document.getElementById('btn-guardar').textContent = 'Guardar cambios';
+    document.getElementById('btn-guardar').disabled = false;
+  });
+
   document.getElementById('btn-guardar').addEventListener('click', async () => {
-    const email = document.getElementById('input-email').value.trim();
-    const bio   = document.getElementById('input-bio').value.trim();
-    const btn   = document.getElementById('btn-guardar');
+    const email      = document.getElementById('input-email').value.trim();
+    const bio        = document.getElementById('input-bio').value.trim();
+    const peso       = document.getElementById('input-peso').value.trim();
+    const disciplina = document.getElementById('input-disciplina').value;
+    const edad       = document.getElementById('input-edad').value.trim();
+    const btn        = document.getElementById('btn-guardar');
 
     btn.disabled    = true;
     btn.textContent = 'Guardando...';
 
-    const res = await apiFetch('/api/me/', 'POST', { email, bio });
+    const res = await apiFetch('/api/me/', 'POST', { 
+      email, bio, 
+      peso: peso || null, 
+      disciplina: disciplina || null, 
+      edad: edad ? parseInt(edad) : null 
+    });
 
     if (res.ok) {
       showToast('Perfil actualizado correctamente', 'success');
@@ -140,6 +261,21 @@
     btn.disabled    = false;
     btn.textContent = 'Guardar cambios';
   });
+
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
 
   loadPerfil();
 </script>
