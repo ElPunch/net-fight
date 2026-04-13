@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Fight.net{% endblock %}</title>
+  {% load static %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --red:      #e8192c;
+      --red-dark: #a8000f;
+      --black:    #0a0a0a;
+      --dark:     #111317;
+      --card:     #1a1d23;
+      --border:   #2a2d35;
+      --text:     #e8e9eb;
+      --muted:    #7a7f8a;
+      --white:    #ffffff;
+      --gold:     #f5c518;
+      --blue:     #3b82f6;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Barlow', sans-serif;
+      background: var(--black);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Navbar ── */
+    nav {
+      background: var(--dark);
+      border-bottom: 2px solid var(--red);
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 58px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.8rem;
+      color: var(--white);
+      letter-spacing: 2px;
+      text-decoration: none;
+    }
+    .nav-logo span { color: var(--red); }
+
+    .nav-links { display: flex; gap: 1.5rem; align-items: center; }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: color .2s;
+    }
+    .nav-links a:hover { color: var(--white); }
+
+    .nav-user {
+      font-size: 0.8rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .nav-user strong { color: var(--gold); }
+
+    .rol-badge {
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      padding: .18rem .5rem;
+      border-radius: 3px;
+    }
+    .rol-fighter  { background: #1e3a5f; color: var(--blue); }
+    .rol-promoter { background: #3b1a1a; color: var(--red); }
+
+    /* ── Contenedor principal ── */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    /* ── Titulos ── */
+    h1, h2, h3 {
+      font-family: 'Bebas Neue', sans-serif;
+      letter-spacing: 1.5px;
+    }
+    h1 { font-size: 2.5rem; }
+    h2 { font-size: 1.8rem; }
+    h3 { font-size: 1.3rem; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.5rem;
+    }
+
+    /* ── Botones ── */
+    .btn {
+      display: inline-block;
+      padding: .55rem 1.4rem;
+      border: none;
+      border-radius: 4px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+      text-decoration: none;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    .btn-primary { background: var(--red); color: var(--white); }
+    .btn-primary:hover { opacity: .88; }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--red);
+      border: 1px solid var(--red);
+    }
+    .btn-outline:hover { background: var(--red); color: var(--white); }
+
+    .btn-danger { background: #450a0a; color: #f87171; border: 1px solid #7f1d1d; }
+    .btn-danger:hover { background: #7f1d1d; }
+
+    .btn-sm { padding: .35rem .9rem; font-size: .82rem; }
+
+    /* ── Inputs ── */
+    input, textarea, select {
+      background: #0f1115;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 4px;
+      padding: .55rem .9rem;
+      font-family: 'Barlow', sans-serif;
+      font-size: .95rem;
+      width: 100%;
+      transition: border-color .2s;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: var(--red);
+    }
+    label {
+      font-size: .8rem;
+      font-weight: 600;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: block;
+      margin-bottom: .3rem;
+    }
+    .form-group { margin-bottom: 1rem; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      padding: .2rem .6rem;
+      border-radius: 3px;
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+    }
+    .badge-activo     { background: #14532d; color: #4ade80; }
+    .badge-cancelado  { background: #450a0a; color: #f87171; }
+    .badge-finalizado { background: #1e1a05; color: var(--gold); }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: var(--card);
+      border-left: 4px solid var(--red);
+      padding: 1rem 1.5rem;
+      border-radius: 4px;
+      font-size: .9rem;
+      display: none;
+      z-index: 999;
+      animation: slideIn .3s ease;
+    }
+    #toast.success { border-color: #4ade80; }
+    @keyframes slideIn {
+      from { transform: translateX(120%); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      border: 3px solid var(--border);
+      border-top-color: var(--red);
+      border-radius: 50%;
+      width: 32px; height: 32px;
+      animation: spin .7s linear infinite;
+      margin: 2rem auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Divisor ── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 1.5rem 0;
+    }
+
+    /* ── Grid de eventos ── */
+    .events-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.2rem;
+      margin-top: 1.5rem;
+    }
+
+    .event-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.3rem;
+      display: flex;
+      flex-direction: column;
+      gap: .6rem;
+      transition: border-color .2s, transform .2s;
+    }
+    .event-card:hover {
+      border-color: var(--red);
+      transform: translateY(-2px);
+    }
+    .event-card h3 { font-size: 1.2rem; color: var(--white); }
+    .event-card .meta {
+      font-size: .82rem;
+      color: var(--muted);
+      display: flex;
+      flex-direction: column;
+      gap: .25rem;
+    }
+    .event-card .actions {
+      margin-top: .5rem;
+      display: flex;
+      gap: .6rem;
+    }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.75);
+      z-index: 200;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--red);
+      border-radius: 8px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 500px;
+      position: relative;
+    }
+    .modal h2 { margin-bottom: 1.2rem; font-size: 1.5rem; }
+    .modal-close {
+      position: absolute; top: 1rem; right: 1rem;
+      background: none; border: none;
+      color: var(--muted); font-size: 1.4rem; cursor: pointer;
+    }
+
+    /* ── Util ── */
+    .text-muted  { color: var(--muted); font-size: .85rem; }
+    .text-center { text-align: center; }
+    .empty-state { text-align: center; padding: 4rem 1rem; color: var(--muted); }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+    .mt-1 { margin-top: .5rem; }
+    .mt-2 { margin-top: 1rem; }
+    .mt-3 { margin-top: 1.5rem; }
+    .flex { display: flex; }
+    .gap-1 { gap: .5rem; }
+    .align-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+  </style>
+</head>
+<body>
+
+{% if user.is_authenticated %}
+<nav>
+  {% if user.profile.rol == 'promoter' %}
+    <a class="nav-logo" href="/promotor/">Fight<span>.</span>net</a>
+    <div class="nav-links">
+      <a href="/promotor/">Mis Eventos</a>
+      <a href="/admin/" target="_blank">Admin</a>
+    </div>
+  {% else %}
+    <a class="nav-logo" href="/peleador/">Fight<span>.</span>net</a>
+    <div class="nav-links">
+      <a href="/peleador/">Eventos</a>
+      <a href="/perfil/">Mi Perfil</a>
+    </div>
+  {% endif %}
+
+  <div class="nav-user">
+    <span class="rol-badge {% if user.profile.rol == 'promoter' %}rol-promoter{% else %}rol-fighter{% endif %}">
+      {% if user.profile.rol == 'promoter' %}Promotor{% else %}Peleador{% endif %}
+    </span>
+    <strong>{{ user.username }}</strong>
+    <a href="/logout/" style="color:var(--red);font-size:.8rem;font-weight:700;text-decoration:none;text-transform:uppercase;letter-spacing:1px;">Salir</a>
+  </div>
+</nav>
+{% endif %}
+
+<div class="container">
+  {% block content %}{% endblock %}
+</div>
+
+<div id="toast"></div>
+
+<script>
+  function showToast(msg, type = 'error') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className   = type;
+    t.style.display = 'block';
+    setTimeout(() => { t.style.display = 'none'; }, 3500);
+  }
+
+  function getCookie(name) {
+    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return match ? match[2] : '';
+  }
+
+  function apiFetch(url, method = 'GET', body = null) {
+    const opts = {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+      credentials: 'same-origin',
+    };
+    if (body) opts.body = JSON.stringify(body);
+    return fetch(url, opts).then(r => r.json());
+  }
+</script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

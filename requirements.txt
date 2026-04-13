@@ -1,0 +1,4 @@
+Django==4.2.16
+psycopg2-binary==2.9.10
+qrcode==7.4.2
+Pillow==10.4.0
