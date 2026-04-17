@@ -67,6 +67,18 @@
     align-items: center;
     font-size: .88rem;
   }
+  .attendee-left { display: flex; align-items: center; gap: .7rem; }
+  .attendee-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--red-dark); border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Bebas Neue', sans-serif; font-size: 1rem;
+    color: var(--white); overflow: hidden; flex-shrink: 0;
+  }
+  .attendee-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .attendee-info { display: flex; flex-direction: column; gap: .1rem; }
+  .attendee-name { font-weight: 600; color: var(--text); }
+  .attendee-disc { font-size: .72rem; color: var(--muted); }
   .check-badge {
     font-size: .72rem;
     padding: .15rem .5rem;
@@ -197,14 +209,26 @@
       return;
     }
 
-    list.innerHTML = res.attendees.map(a => `
+    list.innerHTML = res.attendees.map(a => {
+      const inicial = a.usuario.charAt(0).toUpperCase();
+      const avatarInner = a.foto_perfil
+        ? `<img src="${a.foto_perfil}" alt="${a.usuario}">`
+        : inicial;
+      const discText = a.disciplina || '';
+      return `
       <div class="attendee-item">
-        <span>${a.usuario}</span>
+        <div class="attendee-left">
+          <div class="attendee-avatar">${avatarInner}</div>
+          <div class="attendee-info">
+            <span class="attendee-name">${a.usuario}</span>
+            ${discText ? `<span class="attendee-disc">${discText}${a.categoria ? ' · ' + a.categoria : ''}</span>` : ''}
+          </div>
+        </div>
         <span class="check-badge ${a.check_in ? 'check-yes' : 'check-no'}">
           ${a.check_in ? '✓ Check-in' : 'Pendiente'}
         </span>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   }
 
   async function loadComments() {

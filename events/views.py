@@ -1,6 +1,5 @@
 """
 views.py - Vistas de Fight.net
-FBV con JsonResponse. Sin Django REST Framework.
 """
 
 import uuid
@@ -13,7 +12,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.conf import settings
 
 from .models import Event, EventRegistration, Comment, UserProfile, EventCreationLog
@@ -24,7 +23,6 @@ from .models import Event, EventRegistration, Comment, UserProfile, EventCreatio
 # ══════════════════════════════════════════════
 
 def get_rol(user):
-    """Devuelve el rol del usuario o 'fighter' por defecto."""
     perfil = getattr(user, 'profile', None)
     return perfil.rol if perfil else 'fighter'
 
@@ -33,34 +31,43 @@ def get_rol(user):
 # VISTAS DE PAGINA
 # ══════════════════════════════════════════════
 
+@ensure_csrf_cookie
 @csrf_exempt
 def login_view(request):
-    """Login: redirige a /promotor/ o /peleador/ segun el rol."""
-    if request.user.is_authenticated:
+    if request.user.is_authenticated and request.method == 'GET':
         return _redirect_by_rol(request.user)
 
     if request.method == 'POST':
-        data = json.loads(request.body)
-        username = data.get('username')
-        password = data.get('password')
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'ok': False, 'error': 'Datos invalidos'}, status=400)
+
+        username = data.get('username', '').strip()
+        password = data.get('password', '')
         user = authenticate(request, username=username, password=password)
         if user:
             login(request, user)
             rol = get_rol(user)
-            return JsonResponse({'ok': True, 'rol': rol})
+            redirect_url = '/promotor/' if rol == 'promoter' else '/peleador/'
+            return JsonResponse({'ok': True, 'rol': rol, 'redirect': redirect_url})
         return JsonResponse({'ok': False, 'error': 'Credenciales incorrectas'}, status=400)
 
     return render(request, 'events/login.html')
 
 
+@ensure_csrf_cookie
 @csrf_exempt
 def register_view(request):
-    """Registro: redirige segun rol tras crear la cuenta."""
-    if request.user.is_authenticated:
+    if request.user.is_authenticated and request.method == 'GET':
         return _redirect_by_rol(request.user)
 
     if request.method == 'POST':
-        data     = json.loads(request.body)
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'ok': False, 'error': 'Datos invalidos'}, status=400)
+
         username = data.get('username', '').strip()
         email    = data.get('email', '').strip()
         password = data.get('password', '')
@@ -69,13 +76,18 @@ def register_view(request):
         if rol not in ('fighter', 'promoter'):
             rol = 'fighter'
 
+        if not username or not password:
+            return JsonResponse({'ok': False, 'error': 'Usuario y contrasena son requeridos'}, status=400)
+
         if User.objects.filter(username=username).exists():
             return JsonResponse({'ok': False, 'error': 'El usuario ya existe'}, status=400)
 
         user = User.objects.create_user(username=username, email=email, password=password)
         UserProfile.objects.create(user=user, rol=rol)
         login(request, user)
-        return JsonResponse({'ok': True, 'rol': rol})
+
+        redirect_url = '/promotor/' if rol == 'promoter' else '/peleador/'
+        return JsonResponse({'ok': True, 'rol': rol, 'redirect': redirect_url})
 
     return render(request, 'events/register.html')
 
@@ -86,7 +98,6 @@ def logout_view(request):
 
 
 def _redirect_by_rol(user):
-    """Redirige al dashboard correspondiente segun el rol."""
     rol = get_rol(user)
     if rol == 'promoter':
         return redirect('dashboard_promotor')
@@ -95,13 +106,11 @@ def _redirect_by_rol(user):
 
 @login_required
 def index(request):
-    """Redirige al dashboard correcto segun rol."""
     return _redirect_by_rol(request.user)
 
 
 @login_required
 def dashboard_promotor(request):
-    """Dashboard exclusivo para promotores."""
     if get_rol(request.user) != 'promoter':
         return redirect('dashboard_peleador')
     return render(request, 'events/index_promotor.html')
@@ -109,7 +118,6 @@ def dashboard_promotor(request):
 
 @login_required
 def dashboard_peleador(request):
-    """Dashboard exclusivo para peleadores."""
     if get_rol(request.user) != 'fighter':
         return redirect('dashboard_promotor')
     return render(request, 'events/index_peleador.html')
@@ -117,7 +125,6 @@ def dashboard_peleador(request):
 
 @login_required
 def perfil_view(request):
-    """Pagina de edicion de perfil (solo peleadores)."""
     if get_rol(request.user) != 'fighter':
         return redirect('dashboard_promotor')
     return render(request, 'events/perfil.html')
@@ -125,13 +132,11 @@ def perfil_view(request):
 
 @login_required
 def event_detail(request, pk):
-    """Detalle de un evento: asistentes y comentarios."""
     return render(request, 'events/event_detail.html', {'event_id': pk})
 
 
 @login_required
 def my_qr(request, registration_id):
-    """Muestra el QR del usuario para un evento."""
     reg = get_object_or_404(EventRegistration, pk=registration_id, usuario=request.user)
     return render(request, 'events/my_qr.html', {'registration': reg})
 
@@ -269,15 +274,20 @@ def api_register_event(request):
 @login_required
 def api_attendees(request, pk):
     event     = get_object_or_404(Event, pk=pk)
-    registros = EventRegistration.objects.filter(evento=event).select_related('usuario')
-    data = [
-        {
-            'usuario':  r.usuario.username,
-            'estado':   r.estado,
-            'check_in': r.check_in,
-        }
-        for r in registros
-    ]
+    registros = EventRegistration.objects.filter(evento=event).select_related(
+        'usuario', 'usuario__profile'
+    )
+    data = []
+    for r in registros:
+        perfil = getattr(r.usuario, 'profile', None)
+        data.append({
+            'usuario':     r.usuario.username,
+            'estado':      r.estado,
+            'check_in':    r.check_in,
+            'foto_perfil': perfil.foto_url if perfil else None,
+            'disciplina':  perfil.get_disciplina_display() if perfil and perfil.disciplina else None,
+            'categoria':   perfil.categoria if perfil else None,
+        })
     return JsonResponse({'attendees': data, 'total': len(data)})
 
 
@@ -366,28 +376,86 @@ def api_me(request):
 
     if request.method == 'GET':
         return JsonResponse({
-            'username': request.user.username,
-            'email':    request.user.email,
-            'rol':      perfil.rol if perfil else 'fighter',
-            'bio':      perfil.bio if perfil else '',
+            'username':    request.user.username,
+            'email':       request.user.email,
+            'rol':         perfil.rol if perfil else 'fighter',
+            'bio':         perfil.bio or '',
+            'foto_perfil': perfil.foto_url if perfil else None,
+            'disciplina':  perfil.disciplina or '',
+            'categoria':   perfil.categoria or '',
+            'peso_kg':     str(perfil.peso_kg) if perfil and perfil.peso_kg else '',
+            'estatura_cm': perfil.estatura_cm or '',
+            'edad':        perfil.edad or '',
+            'victorias':   perfil.victorias if perfil else 0,
+            'derrotas':    perfil.derrotas if perfil else 0,
+            'empates':     perfil.empates if perfil else 0,
         })
 
+    # POST: acepta multipart (con foto) o JSON (sin foto)
     if request.method == 'POST':
         if get_rol(request.user) != 'fighter':
             return JsonResponse({'error': 'Solo los peleadores pueden editar su perfil'}, status=403)
 
-        data  = json.loads(request.body)
-        email = data.get('email', '').strip()
-        bio   = data.get('bio', '').strip()
+        # Detectar si viene como multipart/form-data (con foto) o JSON
+        content_type = request.content_type or ''
+        if 'multipart' in content_type:
+            data = request.POST
+            foto = request.FILES.get('foto_perfil')
+        else:
+            try:
+                data = json.loads(request.body)
+            except json.JSONDecodeError:
+                return JsonResponse({'error': 'Datos invalidos'}, status=400)
+            foto = None
 
+        # Actualizar User
+        email = data.get('email', '').strip()
         if email:
             request.user.email = email
             request.user.save()
 
+        # Actualizar perfil
         if perfil:
-            perfil.bio = bio
+            if data.get('bio') is not None:
+                perfil.bio = data.get('bio', '').strip()
+            if data.get('disciplina') is not None:
+                perfil.disciplina = data.get('disciplina', '') or None
+            if data.get('categoria') is not None:
+                perfil.categoria = data.get('categoria', '').strip() or None
+            if data.get('peso_kg') is not None:
+                try:
+                    perfil.peso_kg = float(data.get('peso_kg')) if data.get('peso_kg') else None
+                except (ValueError, TypeError):
+                    perfil.peso_kg = None
+            if data.get('estatura_cm') is not None:
+                try:
+                    perfil.estatura_cm = int(data.get('estatura_cm')) if data.get('estatura_cm') else None
+                except (ValueError, TypeError):
+                    perfil.estatura_cm = None
+            if data.get('edad') is not None:
+                try:
+                    perfil.edad = int(data.get('edad')) if data.get('edad') else None
+                except (ValueError, TypeError):
+                    perfil.edad = None
+            if data.get('victorias') is not None:
+                try:
+                    perfil.victorias = int(data.get('victorias', 0))
+                except (ValueError, TypeError):
+                    pass
+            if data.get('derrotas') is not None:
+                try:
+                    perfil.derrotas = int(data.get('derrotas', 0))
+                except (ValueError, TypeError):
+                    pass
+            if data.get('empates') is not None:
+                try:
+                    perfil.empates = int(data.get('empates', 0))
+                except (ValueError, TypeError):
+                    pass
+            if foto:
+                perfil.foto_perfil = foto
             perfil.save()
 
-        return JsonResponse({'ok': True})
+        return JsonResponse({'ok': True, 'foto_perfil': perfil.foto_url if perfil else None})
 
     return JsonResponse({'error': 'Metodo no permitido'}, status=405)

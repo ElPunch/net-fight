@@ -3,66 +3,68 @@
 
 {% block content %}
 <style>
-  .perfil-wrapper {
-    max-width: 560px;
-    margin: 0 auto;
-  }
-  .perfil-header {
-    margin-bottom: 2rem;
-  }
-  .perfil-header h1 { font-size: 2rem; }
-  .perfil-header p  { color: var(--muted); font-size: .9rem; margin-top: .3rem; }
-
-  .avatar {
-    width: 72px;
-    height: 72px;
-    border-radius: 50%;
-    background: var(--red-dark);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 2rem;
-    color: var(--white);
-    margin-bottom: 1.2rem;
-    border: 2px solid var(--red);
-  }
-
-  .info-readonly {
-    background: #0f1115;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: .55rem .9rem;
-    font-size: .95rem;
-    color: var(--muted);
-    width: 100%;
-  }
-
-  .section-divider {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 1rem;
-    letter-spacing: 1.5px;
-    color: var(--muted);
-    text-transform: uppercase;
-    margin: 1.5rem 0 1rem;
-    padding-bottom: .4rem;
-    border-bottom: 1px solid var(--border);
-  }
+  .perfil-wrapper { max-width: 600px; margin: 0 auto; }
 
   .back-link {
-    display: inline-flex;
-    align-items: center;
-    gap: .4rem;
-    color: var(--muted);
-    text-decoration: none;
-    font-size: .85rem;
-    font-weight: 600;
-    letter-spacing: .5px;
-    text-transform: uppercase;
-    margin-bottom: 1.5rem;
-    transition: color .2s;
+    display: inline-flex; align-items: center; gap: .4rem;
+    color: var(--muted); text-decoration: none; font-size: .85rem;
+    font-weight: 600; letter-spacing: .5px; text-transform: uppercase;
+    margin-bottom: 1.5rem; transition: color .2s;
   }
   .back-link:hover { color: var(--white); }
+
+  .avatar-section {
+    display: flex; align-items: center; gap: 1.5rem;
+    margin-bottom: 2rem;
+    padding: 1.2rem 1.5rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .avatar {
+    width: 90px; height: 90px; border-radius: 50%;
+    background: var(--red-dark);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Bebas Neue', sans-serif; font-size: 2.4rem;
+    color: var(--white); border: 3px solid var(--red);
+    overflow: hidden; flex-shrink: 0; cursor: pointer;
+    position: relative;
+  }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .avatar-overlay {
+    position: absolute; inset: 0; background: rgba(0,0,0,.55);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity .2s; font-size: .7rem;
+    font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+  }
+  .avatar:hover .avatar-overlay { opacity: 1; }
+  #foto-input { display: none; }
+
+  .avatar-info h2 { font-size: 1.5rem; margin-bottom: .2rem; }
+  .avatar-info p  { color: var(--muted); font-size: .85rem; }
+  .record-badges  { display: flex; gap: .5rem; margin-top: .5rem; flex-wrap: wrap; }
+  .record-badge   {
+    font-size: .75rem; font-weight: 700; padding: .2rem .6rem;
+    border-radius: 3px; letter-spacing: .5px;
+  }
+  .badge-win  { background: #14532d; color: #4ade80; }
+  .badge-loss { background: #450a0a; color: #f87171; }
+  .badge-draw { background: #1c1c2e; color: #a78bfa; }
+
+  .section-divider {
+    font-family: 'Bebas Neue', sans-serif; font-size: 1rem;
+    letter-spacing: 1.5px; color: var(--muted); text-transform: uppercase;
+    margin: 1.5rem 0 1rem; padding-bottom: .4rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media(max-width:500px){ .two-col { grid-template-columns: 1fr; } }
+
+  .info-readonly {
+    background: #0f1115; border: 1px solid var(--border);
+    border-radius: 4px; padding: .55rem .9rem;
+    font-size: .95rem; color: var(--muted); width: 100%;
+  }
 </style>
 
 <div class="perfil-wrapper">
@@ -71,31 +73,92 @@
   <div id="loading"><div class="spinner"></div></div>
 
   <div id="perfil-content" style="display:none">
-    <div class="avatar" id="avatar-inicial">?</div>
 
-    <div class="perfil-header">
-      <h1>Mi Perfil</h1>
-      <p>Actualiza tu informacion personal</p>
+    <!-- Avatar + nombre + récord -->
+    <div class="avatar-section">
+      <div class="avatar" id="avatar-wrap" title="Cambiar foto">
+        <span id="avatar-inicial">?</span>
+        <div class="avatar-overlay">📷 Cambiar</div>
+      </div>
+      <input type="file" id="foto-input" accept="image/*">
+      <div class="avatar-info">
+        <h2 id="info-username">—</h2>
+        <p id="info-disciplina-display">—</p>
+        <div class="record-badges">
+          <span class="record-badge badge-win"  id="badge-v">0 V</span>
+          <span class="record-badge badge-loss" id="badge-d">0 D</span>
+          <span class="record-badge badge-draw" id="badge-e">0 E</span>
+        </div>
+      </div>
     </div>
 
-    <div class="section-divider">Informacion de cuenta</div>
+    <!-- Cuenta (solo lectura) -->
+    <div class="section-divider">Información de cuenta</div>
     <div class="form-group">
       <label>Usuario</label>
-      <div class="info-readonly" id="info-username">—</div>
+      <div class="info-readonly" id="info-username-ro">—</div>
     </div>
-    <div class="form-group">
-      <label>Rol</label>
-      <div class="info-readonly">Peleador</div>
-    </div>
-
-    <div class="section-divider">Datos editables</div>
     <div class="form-group">
       <label>Email</label>
       <input type="email" id="input-email" placeholder="tu@email.com">
     </div>
+
+    <!-- Datos de peleador -->
+    <div class="section-divider">Datos de peleador</div>
     <div class="form-group">
-      <label>Bio</label>
-      <textarea id="input-bio" rows="4" placeholder="Cuentanos sobre ti: peso, categoria, estilo de pelea..."></textarea>
+      <label>Disciplina principal</label>
+      <select id="input-disciplina">
+        <option value="">— Sin especificar —</option>
+        <option value="mma">MMA</option>
+        <option value="boxeo">Boxeo</option>
+        <option value="kickboxing">Kickboxing</option>
+        <option value="jiujitsu">Jiu-Jitsu</option>
+        <option value="muaythai">Muay Thai</option>
+        <option value="lucha">Lucha Libre</option>
+        <option value="karate">Karate</option>
+        <option value="otro">Otro</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Categoría / División de peso</label>
+      <input type="text" id="input-categoria" placeholder="ej. Peso Welter, Peso Ligero...">
+    </div>
+    <div class="two-col">
+      <div class="form-group">
+        <label>Peso (kg)</label>
+        <input type="number" id="input-peso" placeholder="70.5" step="0.1" min="30" max="200">
+      </div>
+      <div class="form-group">
+        <label>Estatura (cm)</label>
+        <input type="number" id="input-estatura" placeholder="175" min="100" max="250">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Edad</label>
+      <input type="number" id="input-edad" placeholder="25" min="16" max="80">
+    </div>
+
+    <!-- Récord -->
+    <div class="section-divider">Récord de peleas</div>
+    <div class="two-col" style="grid-template-columns:1fr 1fr 1fr">
+      <div class="form-group">
+        <label>Victorias</label>
+        <input type="number" id="input-victorias" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label>Derrotas</label>
+        <input type="number" id="input-derrotas" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label>Empates</label>
+        <input type="number" id="input-empates" placeholder="0" min="0">
+      </div>
+    </div>
+
+    <!-- Bio -->
+    <div class="section-divider">Biografía</div>
+    <div class="form-group">
+      <textarea id="input-bio" rows="4" placeholder="Cuéntanos sobre ti, tu trayectoria, tu estilo..."></textarea>
     </div>
 
     <div style="display:flex;justify-content:flex-end;margin-top:1.2rem">
@@ -103,41 +166,134 @@
     </div>
   </div>
 </div>
-
 {% endblock %}
 
 {% block scripts %}
 <script>
+  let fotoFile = null;
+
   async function loadPerfil() {
     const res = await apiFetch('/api/me/');
 
-    document.getElementById('info-username').textContent = res.username;
-    document.getElementById('input-email').value         = res.email || '';
-    document.getElementById('input-bio').value           = res.bio   || '';
-    document.getElementById('avatar-inicial').textContent =
-      res.username.charAt(0).toUpperCase();
+    document.getElementById('info-username').textContent    = res.username;
+    document.getElementById('info-username-ro').textContent = res.username;
+    document.getElementById('input-email').value            = res.email || '';
+    document.getElementById('input-bio').value              = res.bio || '';
+    document.getElementById('input-disciplina').value       = res.disciplina || '';
+    document.getElementById('input-categoria').value        = res.categoria || '';
+    document.getElementById('input-peso').value             = res.peso_kg || '';
+    document.getElementById('input-estatura').value         = res.estatura_cm || '';
+    document.getElementById('input-edad').value             = res.edad || '';
+    document.getElementById('input-victorias').value        = res.victorias || 0;
+    document.getElementById('input-derrotas').value         = res.derrotas || 0;
+    document.getElementById('input-empates').value          = res.empates || 0;
+
+    // Badges de récord
+    document.getElementById('badge-v').textContent = `${res.victorias || 0} V`;
+    document.getElementById('badge-d').textContent = `${res.derrotas || 0} D`;
+    document.getElementById('badge-e').textContent = `${res.empates || 0} E`;
+
+    // Disciplina display
+    const disciplinaLabels = {
+      mma: 'MMA', boxeo: 'Boxeo', kickboxing: 'Kickboxing',
+      jiujitsu: 'Jiu-Jitsu', muaythai: 'Muay Thai',
+      lucha: 'Lucha Libre', karate: 'Karate', otro: 'Otro'
+    };
+    document.getElementById('info-disciplina-display').textContent =
+      res.disciplina ? disciplinaLabels[res.disciplina] || res.disciplina : 'Sin disciplina registrada';
+
+    // Avatar
+    const wrap = document.getElementById('avatar-wrap');
+    if (res.foto_perfil) {
+      wrap.innerHTML = `<img src="${res.foto_perfil}" alt="Foto de perfil">
+        <div class="avatar-overlay">📷 Cambiar</div>`;
+    } else {
+      document.getElementById('avatar-inicial').textContent = res.username.charAt(0).toUpperCase();
+    }
 
     document.getElementById('loading').style.display        = 'none';
     document.getElementById('perfil-content').style.display = 'block';
   }
 
-  document.getElementById('btn-guardar').addEventListener('click', async () => {
-    const email = document.getElementById('input-email').value.trim();
-    const bio   = document.getElementById('input-bio').value.trim();
-    const btn   = document.getElementById('btn-guardar');
+  // Click en avatar abre selector de archivo
+  document.getElementById('avatar-wrap').addEventListener('click', () => {
+    document.getElementById('foto-input').click();
+  });
 
-    btn.disabled    = true;
+  // Preview de la foto antes de guardar
+  document.getElementById('foto-input').addEventListener('change', (e) => {
+    fotoFile = e.target.files[0];
+    if (!fotoFile) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const wrap = document.getElementById('avatar-wrap');
+      wrap.innerHTML = `<img src="${ev.target.result}" alt="Nueva foto">
+        <div class="avatar-overlay">📷 Cambiar</div>`;
+    };
+    reader.readAsDataURL(fotoFile);
+  });
+
+  document.getElementById('btn-guardar').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-guardar');
+    btn.disabled = true;
     btn.textContent = 'Guardando...';
 
-    const res = await apiFetch('/api/me/', 'POST', { email, bio });
+    let res;
+
+    if (fotoFile) {
+      // Con foto: usar FormData (multipart)
+      const form = new FormData();
+      form.append('foto_perfil',  fotoFile);
+      form.append('email',        document.getElementById('input-email').value.trim());
+      form.append('bio',          document.getElementById('input-bio').value.trim());
+      form.append('disciplina',   document.getElementById('input-disciplina').value);
+      form.append('categoria',    document.getElementById('input-categoria').value.trim());
+      form.append('peso_kg',      document.getElementById('input-peso').value);
+      form.append('estatura_cm',  document.getElementById('input-estatura').value);
+      form.append('edad',         document.getElementById('input-edad').value);
+      form.append('victorias',    document.getElementById('input-victorias').value || 0);
+      form.append('derrotas',     document.getElementById('input-derrotas').value || 0);
+      form.append('empates',      document.getElementById('input-empates').value || 0);
+
+      try {
+        const r = await fetch('/api/me/', {
+          method: 'POST',
+          headers: { 'X-CSRFToken': getCookie('csrftoken') },
+          credentials: 'same-origin',
+          body: form,
+        });
+        res = await r.json();
+      } catch (err) {
+        res = { ok: false, error: 'Error de conexion' };
+      }
+    } else {
+      // Sin foto: JSON normal
+      res = await apiFetch('/api/me/', 'POST', {
+        email:       document.getElementById('input-email').value.trim(),
+        bio:         document.getElementById('input-bio').value.trim(),
+        disciplina:  document.getElementById('input-disciplina').value,
+        categoria:   document.getElementById('input-categoria').value.trim(),
+        peso_kg:     document.getElementById('input-peso').value,
+        estatura_cm: document.getElementById('input-estatura').value,
+        edad:        document.getElementById('input-edad').value,
+        victorias:   document.getElementById('input-victorias').value || 0,
+        derrotas:    document.getElementById('input-derrotas').value || 0,
+        empates:     document.getElementById('input-empates').value || 0,
+      });
+    }
 
     if (res.ok) {
+      fotoFile = null;
       showToast('Perfil actualizado correctamente', 'success');
+      // Actualizar badges en vivo
+      document.getElementById('badge-v').textContent = `${document.getElementById('input-victorias').value || 0} V`;
+      document.getElementById('badge-d').textContent = `${document.getElementById('input-derrotas').value || 0} D`;
+      document.getElementById('badge-e').textContent = `${document.getElementById('input-empates').value || 0} E`;
     } else {
       showToast(res.error || 'Error al guardar');
     }
 
-    btn.disabled    = false;
+    btn.disabled = false;
     btn.textContent = 'Guardar cambios';
   });
 

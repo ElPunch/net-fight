@@ -1,10 +1,6 @@
 """
 models.py – Modelos de Fight.net
 5 tablas principales con relaciones claras.
-
-Decisión de diseño: usamos el modelo User de Django (auth.User) en lugar de
-crear uno propio. Esto evita duplicar lógica de autenticación y cumple con
-"sin sobreingeniería". Añadimos un perfil (UserProfile) para el campo 'rol'.
 """
 
 from django.db import models
@@ -21,9 +17,33 @@ class UserProfile(models.Model):
         ('admin',    'Administrador'),
     ]
 
-    user     = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    rol      = models.CharField(max_length=10, choices=ROL_CHOICES, default='fighter')
-    bio      = models.TextField(blank=True, null=True)
+    DISCIPLINA_CHOICES = [
+        ('mma',        'MMA'),
+        ('boxeo',      'Boxeo'),
+        ('kickboxing', 'Kickboxing'),
+        ('jiujitsu',   'Jiu-Jitsu'),
+        ('muaythai',   'Muay Thai'),
+        ('lucha',      'Lucha Libre'),
+        ('karate',     'Karate'),
+        ('otro',       'Otro'),
+    ]
+
+    user        = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    rol         = models.CharField(max_length=10, choices=ROL_CHOICES, default='fighter')
+    bio         = models.TextField(blank=True, null=True)
+
+    # Campos de identidad como peleador
+    foto_perfil = models.ImageField(upload_to='perfiles/', blank=True, null=True)
+    disciplina  = models.CharField(max_length=20, choices=DISCIPLINA_CHOICES, blank=True, null=True)
+    categoria   = models.CharField(max_length=50, blank=True, null=True)
+    peso_kg     = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
+    estatura_cm = models.IntegerField(blank=True, null=True)
+    edad        = models.IntegerField(blank=True, null=True)
+
+    # Récord de peleas
+    victorias   = models.IntegerField(default=0)
+    derrotas    = models.IntegerField(default=0)
+    empates     = models.IntegerField(default=0)
 
     class Meta:
         verbose_name = 'Perfil de usuario'
@@ -31,6 +51,12 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f'{self.user.username} ({self.get_rol_display()})'
+
+    @property
+    def foto_url(self):
+        if self.foto_perfil:
+            return self.foto_perfil.url
+        return None
 
 
 # ──────────────────────────────────────────────
@@ -62,10 +88,6 @@ class Event(models.Model):
 
 # ──────────────────────────────────────────────
 # TABLA 3: Registro a evento (tabla intermedia Users ↔ Events)
-# Aquí también se almacena el QR de cada inscripción.
-# Decisión: incluir el QR aquí (campo imagen) en lugar de tabla separada,
-# ya que el profesor pide "básico". La tabla EventCheckIn del PDF
-# se omite para no sobrecomplicar.
 # ──────────────────────────────────────────────
 class EventRegistration(models.Model):
     ESTADO_CHOICES = [
@@ -78,17 +100,17 @@ class EventRegistration(models.Model):
     evento         = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='registros')
     fecha_registro = models.DateTimeField(auto_now_add=True)
     estado         = models.CharField(max_length=15, choices=ESTADO_CHOICES, default='registrado')
-    codigo_qr      = models.CharField(max_length=100, unique=True, blank=True)  # código único
+    codigo_qr      = models.CharField(max_length=100, unique=True, blank=True)
     imagen_qr      = models.ImageField(upload_to='qrcodes/', blank=True, null=True)
     check_in       = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = 'Registro a evento'
         verbose_name_plural = 'Registros a eventos'
-        unique_together = ('usuario', 'evento')   # un usuario no se registra dos veces
+        unique_together = ('usuario', 'evento')
 
     def __str__(self):
-        return f'{self.usuario.username} → {self.evento.titulo}'
+        return f'{self.usuario.username} -> {self.evento.titulo}'
 
 
 # ──────────────────────────────────────────────
@@ -111,7 +133,6 @@ class Comment(models.Model):
 
 # ──────────────────────────────────────────────
 # TABLA 5: Auditoría de creación de eventos
-# Cubre el requisito del PDF (EventCreation) y sirve como 5.ª tabla.
 # ──────────────────────────────────────────────
 class EventCreationLog(models.Model):
     ESTATUS_CHOICES = [
@@ -124,13 +145,10 @@ class EventCreationLog(models.Model):
     creador         = models.ForeignKey(User, on_delete=models.CASCADE)
     fecha_creacion  = models.DateTimeField(auto_now_add=True)
     estatus         = models.CharField(max_length=15, choices=ESTATUS_CHOICES, default='aprobado')
-    # Nota: en este proyecto académico los eventos se aprueban automáticamente.
-    # El admin puede cambiar el estatus desde el panel si lo desea.
 
     class Meta:
-        verbose_name = 'Log de creación de evento'
-        verbose_name_plural = 'Logs de creación de eventos'
+        verbose_name = 'Log de creacion de evento'
+        verbose_name_plural = 'Logs de creacion de eventos'
 
     def __str__(self):
-        return f'Log: {self.evento.titulo} – {self.get_estatus_display()}'
-
+        return f'Log: {self.evento.titulo} - {self.get_estatus_display()}'

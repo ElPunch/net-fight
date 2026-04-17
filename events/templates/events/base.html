@@ -347,7 +347,7 @@
     return match ? match[2] : '';
   }
 
-  function apiFetch(url, method = 'GET', body = null) {
+  async function apiFetch(url, method = 'GET', body = null) {
     const opts = {
       method,
       headers: {
@@ -357,7 +357,18 @@
       credentials: 'same-origin',
     };
     if (body) opts.body = JSON.stringify(body);
-    return fetch(url, opts).then(r => r.json());
+    try {
+      const r = await fetch(url, opts);
+      const text = await r.text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        // El servidor respondió algo que no es JSON (ej. redirect en HTML)
+        return { ok: false, error: 'Error de servidor (' + r.status + ')' };
+      }
+    } catch (err) {
+      return { ok: false, error: 'Error de conexión' };
+    }
   }
 </script>
 

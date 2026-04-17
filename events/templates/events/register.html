@@ -127,7 +127,7 @@
 
     const res = await apiFetch('/register/', 'POST', { username, email, password, rol: rolSelected });
     if (res.ok) {
-      window.location.href = '/';
+      window.location.href = res.redirect || '/';
     } else {
       showToast(res.error || 'Error al registrar');
     }
