@@ -7,7 +7,7 @@ readonly_fields, inlines y personalizacion del sitio.
 from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import UserProfile, Event, EventRegistration, Comment, EventCreationLog
+from .models import UserProfile, Event, EventRegistration, Comment, Fight, EventCreationLog
 
 
 # ══════════════════════════════════════════════
@@ -83,11 +83,20 @@ class UserProfileAdmin(admin.ModelAdmin):
 
 
 # ══════════════════════════════════════════════
-# TABLA 2: Eventos
+# TABLA 2: Eventos  (con inline de enfrentamientos)
 # ══════════════════════════════════════════════
+
+class FightInline(admin.TabularInline):
+    model          = Fight
+    fk_name        = 'evento'
+    extra          = 0
+    autocomplete_fields = ('peleador_a', 'peleador_b')
+    fields         = ('orden', 'titulo', 'peleador_a', 'peleador_b', 'notas')
+
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
+    inlines             = [FightInline]
     list_display        = ('titulo', 'creador', 'fecha', 'ubicacion', 'estado', 'total_registros', 'fecha_creacion')
     list_display_links  = ('titulo',)
     search_fields       = ('titulo', 'descripcion', 'ubicacion', 'creador__username')
@@ -166,7 +175,21 @@ class CommentAdmin(admin.ModelAdmin):
 
 
 # ══════════════════════════════════════════════
-# TABLA 5: Log de creacion de eventos
+# TABLA 5: Enfrentamientos
+# ══════════════════════════════════════════════
+
+@admin.register(Fight)
+class FightAdmin(admin.ModelAdmin):
+    list_display        = ('evento', 'orden', 'titulo', 'peleador_a', 'peleador_b')
+    list_display_links  = ('evento', 'titulo')
+    search_fields       = ('evento__titulo', 'peleador_a__username', 'peleador_b__username', 'titulo')
+    list_filter         = ('evento',)
+    autocomplete_fields = ('peleador_a', 'peleador_b')
+    ordering            = ('evento', 'orden')
+
+
+# ══════════════════════════════════════════════
+# TABLA 6: Log de creacion de eventos
 # ══════════════════════════════════════════════
 
 @admin.register(EventCreationLog)
