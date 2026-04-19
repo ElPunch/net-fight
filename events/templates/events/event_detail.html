@@ -1,5 +1,5 @@
 {% extends 'events/base.html' %}
-{% block title %}Fight.net – Detalle de Evento{% endblock %}
+{% block title %}Fight.net - Detalle de Evento{% endblock %}
 
 {% block content %}
 <style>
@@ -54,6 +54,69 @@
     border-radius: 2px;
     font-family: 'Barlow', sans-serif;
     font-weight: 700;
+  }
+
+  /* Cartelera de peleas */
+  .fight-card {
+    margin-bottom: 2rem;
+    background: linear-gradient(135deg, #1a1d23 0%, #12141a 100%);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--red);
+    border-radius: 8px;
+    padding: 1.3rem 1.5rem;
+  }
+  .fight-card h2 {
+    font-size: 1.6rem;
+    color: var(--gold);
+    margin-bottom: .3rem;
+  }
+  .fight-list { display:flex; flex-direction:column; gap: .8rem; margin-top: 1rem; }
+  .fight-row2 {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.2rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .fight-side { display: flex; align-items: center; gap: .8rem; }
+  .fight-side.right { justify-content: flex-end; text-align: right; }
+  .fight-side.right .fighter-info { order: -1; text-align: right; }
+  .fighter-avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--red-dark);
+    border: 2px solid var(--red);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem;
+    color: var(--white); overflow: hidden; flex-shrink: 0;
+  }
+  .fighter-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .fighter-info { display: flex; flex-direction: column; gap: .1rem; }
+  .fighter-name { font-weight: 700; color: var(--white); font-size: 1rem; }
+  .fighter-sub  { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .fighter-record {
+    font-size: .7rem;
+    color: var(--gold);
+    font-family: 'Barlow Condensed', sans-serif;
+    letter-spacing: 1px;
+  }
+  .vs-sep {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    color: var(--red);
+    text-align: center;
+    padding: 0 .5rem;
+  }
+  .fight-title-tag {
+    font-size: .7rem;
+    text-align: center;
+    color: var(--gold);
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: .3rem;
   }
 
   .attendee-list { display: flex; flex-direction: column; gap: .5rem; }
@@ -118,22 +181,29 @@
   .my-qr-box p { font-size: .9rem; color: #4ade80; }
 </style>
 
-<a href="javascript:history.back()" class="back-link">← Volver</a>
+<a href="javascript:history.back()" class="back-link">&larr; Volver</a>
 
 <div id="loading"><div class="spinner"></div></div>
 <div id="content" style="display:none">
 
   <div class="detail-header">
     <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
-      <h1 id="ev-titulo">—</h1>
+      <h1 id="ev-titulo">-</h1>
       <span id="ev-estado" class="badge"></span>
     </div>
     <div class="detail-meta">
-      <span>📅 <span id="ev-fecha">—</span></span>
-      <span>📍 <span id="ev-ubicacion">—</span></span>
-      <span>👤 <span id="ev-creador">—</span></span>
+      <span>Fecha: <span id="ev-fecha">-</span></span>
+      <span>Lugar: <span id="ev-ubicacion">-</span></span>
+      <span>Promotor: <span id="ev-creador">-</span></span>
     </div>
     <p id="ev-desc" style="margin-top:.8rem;font-size:.95rem;line-height:1.6;color:var(--muted)"></p>
+  </div>
+
+  <!-- ====== CARTELERA ====== -->
+  <div class="fight-card" id="fight-card" style="display:none">
+    <h2>Cartelera</h2>
+    <p class="text-muted" id="fights-count">0 enfrentamientos anunciados</p>
+    <div class="fight-list" id="fight-list"></div>
   </div>
 
   <div class="two-col">
@@ -175,7 +245,7 @@
 
   <!-- Mi QR: visible solo si el peleador ya esta registrado -->
   <div class="my-qr-box" id="my-qr-box" style="display:none">
-    <p>🎫 Estas registrado en este evento.</p>
+    <p>Estas registrado en este evento.</p>
     <a href="#" id="my-qr-link" class="btn btn-primary btn-sm">Ver mi QR de acceso</a>
   </div>
 
@@ -187,29 +257,70 @@
 <script>
   const EVENT_ID = {{ event_id }};
 
+  function renderFighterSide(info, rightAlign=false) {
+    const initial = (info.username || '?').charAt(0).toUpperCase();
+    const avatarInner = info.foto_perfil
+      ? `<img src="${info.foto_perfil}" alt="${info.username}">`
+      : initial;
+    const sub = [info.disciplina, info.categoria].filter(Boolean).join(' | ');
+    const body = `
+      <div class="fighter-avatar">${avatarInner}</div>
+      <div class="fighter-info">
+        <span class="fighter-name">${info.username}</span>
+        ${sub ? `<span class="fighter-sub">${sub}</span>` : ''}
+        ${info.record ? `<span class="fighter-record">Record: ${info.record}</span>` : ''}
+      </div>`;
+    return `<div class="fight-side ${rightAlign?'right':''}">${body}</div>`;
+  }
+
   async function loadEvent() {
     const res = await apiFetch(`/api/events/${EVENT_ID}/`);
     document.getElementById('ev-titulo').textContent    = res.titulo;
-    document.getElementById('ev-fecha').textContent     = res.fecha;
+    document.getElementById('ev-fecha').textContent     = res.fecha_formateada || res.fecha;
     document.getElementById('ev-ubicacion').textContent = res.ubicacion;
     document.getElementById('ev-creador').textContent   = res.creador;
     document.getElementById('ev-desc').textContent      = res.descripcion;
     const badge = document.getElementById('ev-estado');
     badge.textContent = res.estado;
     badge.className   = `badge badge-${res.estado}`;
+
+    // Cartelera
+    const fights = res.enfrentamientos || [];
+    const fightCard = document.getElementById('fight-card');
+    const list      = document.getElementById('fight-list');
+    document.getElementById('fights-count').textContent =
+      `${fights.length} enfrentamiento${fights.length !== 1 ? 's' : ''} anunciado${fights.length !== 1 ? 's' : ''}`;
+
+    if (fights.length === 0) {
+      fightCard.style.display = 'block';
+      list.innerHTML = '<div class="text-muted text-center">Aun no se han anunciado enfrentamientos.</div>';
+    } else {
+      fightCard.style.display = 'block';
+      list.innerHTML = fights.map(f => `
+        <div>
+          ${f.titulo ? `<div class="fight-title-tag">${f.titulo}</div>` : ''}
+          <div class="fight-row2">
+            ${renderFighterSide(f.peleador_a_info, false)}
+            <div class="vs-sep">VS</div>
+            ${renderFighterSide(f.peleador_b_info, true)}
+          </div>
+        </div>
+      `).join('');
+    }
   }
 
   async function loadAttendees() {
     const res  = await apiFetch(`/api/event-attendees/${EVENT_ID}/`);
     const list = document.getElementById('attendee-list');
-    document.getElementById('total-badge').textContent = res.total;
+    const arr  = Array.isArray(res) ? res : (res.results || []);
+    document.getElementById('total-badge').textContent = arr.length;
 
-    if (res.attendees.length === 0) {
+    if (arr.length === 0) {
       list.innerHTML = '<div class="text-muted text-center">Sin registros aun</div>';
       return;
     }
 
-    list.innerHTML = res.attendees.map(a => {
+    list.innerHTML = arr.map(a => {
       const inicial = a.usuario.charAt(0).toUpperCase();
       const avatarInner = a.foto_perfil
         ? `<img src="${a.foto_perfil}" alt="${a.usuario}">`
@@ -221,11 +332,11 @@
           <div class="attendee-avatar">${avatarInner}</div>
           <div class="attendee-info">
             <span class="attendee-name">${a.usuario}</span>
-            ${discText ? `<span class="attendee-disc">${discText}${a.categoria ? ' · ' + a.categoria : ''}</span>` : ''}
+            ${discText ? `<span class="attendee-disc">${discText}${a.categoria ? ' . ' + a.categoria : ''}</span>` : ''}
           </div>
         </div>
         <span class="check-badge ${a.check_in ? 'check-yes' : 'check-no'}">
-          ${a.check_in ? '✓ Check-in' : 'Pendiente'}
+          ${a.check_in ? 'Check-in OK' : 'Pendiente'}
         </span>
       </div>`;
     }).join('');
@@ -234,17 +345,18 @@
   async function loadComments() {
     const res  = await apiFetch(`/api/event-comments/${EVENT_ID}/`);
     const list = document.getElementById('comment-list');
+    const arr  = Array.isArray(res) ? res : (res.results || []);
 
-    if (res.comments.length === 0) {
+    if (arr.length === 0) {
       list.innerHTML = '<div class="text-muted text-center">Sin comentarios aun</div>';
       return;
     }
 
-    list.innerHTML = res.comments.map(c => `
+    list.innerHTML = arr.map(c => `
       <div class="comment-item">
         <div class="comment-user">${c.usuario}</div>
         <div class="comment-text">${c.contenido}</div>
-        <div class="comment-date">${c.fecha}</div>
+        <div class="comment-date">${c.fecha || ''}</div>
       </div>
     `).join('');
   }
@@ -268,11 +380,11 @@
     const contenido = document.getElementById('comment-input').value.trim();
     if (!contenido) { showToast('Escribe algo primero'); return; }
     const res = await apiFetch(`/api/event-comments/${EVENT_ID}/`, 'POST', { contenido });
-    if (res.ok) {
+    if (res && (res.id || res.ok)) {
       document.getElementById('comment-input').value = '';
       loadComments();
     } else {
-      showToast(res.error || 'Error al publicar');
+      showToast(res.detail || res.error || 'Error al publicar');
     }
   });
 
@@ -282,12 +394,12 @@
     const res    = await apiFetch('/api/check-in/', 'POST', { codigo_qr: codigo });
     const result = document.getElementById('checkin-result');
     if (res.ok) {
-      result.textContent = `✅ Check-in: ${res.usuario} → ${res.evento}`;
+      result.textContent = `OK: ${res.usuario} -> ${res.evento}`;
       result.style.color = '#4ade80';
       document.getElementById('qr-input').value = '';
       loadAttendees();
     } else {
-      result.textContent = `❌ ${res.error}`;
+      result.textContent = `ERR: ${res.detail || res.error}`;
       result.style.color = 'var(--red)';
     }
   });
