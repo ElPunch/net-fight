@@ -282,7 +282,8 @@
       });
     }
 
-    if (res.ok) {
+    // DRF devuelve el recurso serializado sin flag 'ok'; usamos 'username' como señal de éxito
+    if (res && (res.ok || res.username)) {
       fotoFile = null;
       showToast('Perfil actualizado correctamente', 'success');
       // Actualizar badges en vivo
@@ -290,7 +291,7 @@
       document.getElementById('badge-d').textContent = `${document.getElementById('input-derrotas').value || 0} D`;
       document.getElementById('badge-e').textContent = `${document.getElementById('input-empates').value || 0} E`;
     } else {
-      showToast(res.error || 'Error al guardar');
+      showToast(res.detail || res.error || 'Error al guardar');
     }
 
     btn.disabled = false;
