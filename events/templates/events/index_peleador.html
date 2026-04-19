@@ -54,7 +54,7 @@
   async function loadEvents() {
     const grid = document.getElementById('events-grid');
     const res  = await apiFetch('/api/events/');
-    const events = res.events || [];
+    const events = Array.isArray(res) ? res : (res.results || res.events || []);
 
     document.getElementById('event-count').textContent =
       `${events.length} evento${events.length !== 1 ? 's' : ''} disponible${events.length !== 1 ? 's' : ''}`;
@@ -62,7 +62,7 @@
     if (events.length === 0) {
       grid.innerHTML = `
         <div class="empty-state" style="grid-column:1/-1">
-          <div class="icon">🥊</div>
+          <div class="icon">*</div>
           <p>No hay eventos disponibles por el momento.</p>
         </div>`;
       return;
@@ -77,7 +77,15 @@
     grid.innerHTML = events.map(e => {
       const reg = registraciones[e.id];
       const yaRegistrado = reg && reg.registered;
-
+      const fights = e.enfrentamientos || [];
+      const fightsMini = fights.length === 0
+        ? ''
+        : `<div style="margin-top:.5rem;font-size:.78rem;color:var(--muted);border-top:1px dashed var(--border);padding-top:.4rem">
+             <strong style="color:var(--gold)">Cartelera (${fights.length}):</strong>
+             ${fights.slice(0,3).map(f => `<div>${f.peleador_a_info.username} vs ${f.peleador_b_info.username}</div>`).join('')}
+             ${fights.length > 3 ? `<div>+ ${fights.length - 3} pelea(s) mas</div>` : ''}
+           </div>`;
+      const fecha = e.fecha_formateada || e.fecha;
       return `
         <div class="event-card">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -85,17 +93,18 @@
             <span class="badge badge-${e.estado}">${e.estado}</span>
           </div>
           <p style="font-size:.88rem;color:var(--muted);line-height:1.5">
-            ${e.descripcion.substring(0,100)}${e.descripcion.length > 100 ? '…' : ''}
+            ${(e.descripcion || '').substring(0,100)}${(e.descripcion || '').length > 100 ? '...' : ''}
           </p>
           <div class="meta">
-            <span>📅 ${e.fecha}</span>
-            <span>📍 ${e.ubicacion}</span>
-            <span>👤 Promotor: ${e.creador}</span>
+            <span>Fecha: ${fecha}</span>
+            <span>Lugar: ${e.ubicacion}</span>
+            <span>Promotor: ${e.creador}</span>
           </div>
+          ${fightsMini}
           <div class="actions">
             <a href="/events/${e.id}/" class="btn btn-outline btn-sm">Ver detalle</a>
             ${yaRegistrado
-              ? `<a href="/my-qr/${reg.registration_id}/" class="btn btn-primary btn-sm">🎫 Mi QR</a>`
+              ? `<a href="/my-qr/${reg.registration_id}/" class="btn btn-primary btn-sm">Mi QR</a>`
               : `<button class="btn btn-primary btn-sm" onclick="registrarme(${e.id}, this)">Registrarme</button>`
             }
           </div>
