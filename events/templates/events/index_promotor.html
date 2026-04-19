@@ -64,6 +64,67 @@
     margin-top: .4rem;
     min-height: 1.2rem;
   }
+
+  /* Modal de creacion: mas grande para caber cartelera */
+  .modal.modal-big { max-width: 720px; }
+
+  .fights-section {
+    margin-top: 1rem;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    background: #0f1115;
+  }
+  .fights-section h4 {
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 1px;
+    color: var(--gold);
+    margin-bottom: .4rem;
+  }
+  .fight-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: .5rem;
+    align-items: end;
+    padding: .6rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: .5rem;
+  }
+  .fight-row .fight-sep {
+    text-align: center;
+    font-family: 'Bebas Neue', sans-serif;
+    color: var(--red);
+    font-size: 1.4rem;
+    align-self: center;
+  }
+  .fight-row button.rm {
+    background: #450a0a;
+    color: #f87171;
+    border: 1px solid #7f1d1d;
+    border-radius: 3px;
+    padding: .35rem .7rem;
+    cursor: pointer;
+    font-size: .75rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    align-self: center;
+  }
+  .fight-row button.rm:hover { background: #7f1d1d; }
+  .fight-row label { font-size: .7rem; }
+  .fight-row select { font-size: .85rem; }
+
+  .event-fights-mini {
+    margin-top: .6rem;
+    font-size: .8rem;
+    color: var(--muted);
+  }
+  .event-fights-mini strong { color: var(--gold); }
+  .event-fights-mini .fight-item {
+    padding: .25rem 0;
+    border-top: 1px dashed var(--border);
+  }
 </style>
 
 <div class="page-header">
@@ -76,7 +137,7 @@
 
 <!-- Check-in rapido por QR -->
 <div class="checkin-section">
-  <span class="checkin-label">⚡ Check-in QR</span>
+  <span class="checkin-label">CHECK-IN QR</span>
   <div style="flex:1;min-width:200px">
     <div style="display:flex;gap:.6rem">
       <input type="text" id="qr-input" placeholder="Pega el codigo QR del asistente">
@@ -96,6 +157,10 @@
     <div class="stat-num" id="stat-asistentes">0</div>
     <div class="stat-label">Total registros</div>
   </div>
+  <div class="stat-card">
+    <div class="stat-num" id="stat-peleas">0</div>
+    <div class="stat-label">Enfrentamientos programados</div>
+  </div>
 </div>
 
 <!-- Grid de eventos del promotor -->
@@ -105,26 +170,42 @@
 
 <!-- Modal crear evento -->
 <div class="modal-overlay" id="modal">
-  <div class="modal">
-    <button class="modal-close" id="btn-close-modal">✕</button>
+  <div class="modal modal-big">
+    <button class="modal-close" id="btn-close-modal">X</button>
     <h2>Nuevo Evento</h2>
+
     <div class="form-group">
       <label>Titulo del evento</label>
-      <input type="text" id="ev-titulo" placeholder="Ej: Noche de MMA – Guadalajara">
+      <input type="text" id="ev-titulo" placeholder="Ej: Noche de MMA - Guadalajara">
     </div>
     <div class="form-group">
       <label>Descripcion</label>
-      <textarea id="ev-desc" rows="3" placeholder="Describe el evento..."></textarea>
+      <textarea id="ev-desc" rows="2" placeholder="Describe el evento..."></textarea>
     </div>
-    <div class="form-group">
-      <label>Fecha y hora</label>
-      <input type="datetime-local" id="ev-fecha">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
+      <div class="form-group">
+        <label>Fecha y hora</label>
+        <input type="datetime-local" id="ev-fecha">
+      </div>
+      <div class="form-group">
+        <label>Ubicacion</label>
+        <input type="text" id="ev-ubicacion" placeholder="Ej: Arena VFG, Guadalajara">
+      </div>
     </div>
-    <div class="form-group">
-      <label>Ubicacion</label>
-      <input type="text" id="ev-ubicacion" placeholder="Ej: Arena VFG, Guadalajara">
+
+    <!-- CARTELERA - Enfrentamientos -->
+    <div class="fights-section">
+      <h4>Cartelera del evento</h4>
+      <p class="text-muted" style="margin-bottom:.6rem">
+        Agrega uno o mas enfrentamientos seleccionando peleadores registrados en el sistema.
+      </p>
+      <div id="fights-container"></div>
+      <button class="btn btn-outline btn-sm" id="btn-add-fight" type="button">
+        + Agregar enfrentamiento
+      </button>
     </div>
-    <div style="display:flex;gap:.8rem;justify-content:flex-end;margin-top:.5rem">
+
+    <div style="display:flex;gap:.8rem;justify-content:flex-end;margin-top:1rem">
       <button class="btn btn-outline" id="btn-cancel">Cancelar</button>
       <button class="btn btn-primary" id="btn-crear">Crear evento</button>
     </div>
@@ -135,60 +216,150 @@
 
 {% block scripts %}
 <script>
+  let FIGHTERS = [];   // cacheado al abrir el modal
+  let fightRowId = 0;
+
+  async function loadFighters() {
+    if (FIGHTERS.length) return FIGHTERS;
+    const res = await apiFetch('/api/fighters/');
+    FIGHTERS = Array.isArray(res) ? res : (res.results || res || []);
+    return FIGHTERS;
+  }
+
+  function buildFighterOptions(selectedId = '') {
+    const opts = ['<option value="">-- Selecciona un peleador --</option>'];
+    for (const f of FIGHTERS) {
+      const label = f.disciplina ? `${f.username} (${f.disciplina})` : f.username;
+      const sel = String(f.user_id) === String(selectedId) ? 'selected' : '';
+      opts.push(`<option value="${f.user_id}" ${sel}>${label}</option>`);
+    }
+    return opts.join('');
+  }
+
+  function addFightRow(data = {}) {
+    const id = ++fightRowId;
+    const container = document.getElementById('fights-container');
+    const div = document.createElement('div');
+    div.className = 'fight-row';
+    div.dataset.rowId = id;
+    const fighterOpts = buildFighterOptions();
+    div.innerHTML = `
+      <div>
+        <label>Peleador A</label>
+        <select class="fight-a">${fighterOpts}</select>
+      </div>
+      <div>
+        <label>Peleador B</label>
+        <select class="fight-b">${fighterOpts}</select>
+      </div>
+      <div>
+        <label>Titulo (opcional)</label>
+        <input type="text" class="fight-title" placeholder="Ej: Pelea estelar">
+      </div>
+      <button type="button" class="rm">Quitar</button>
+    `;
+    container.appendChild(div);
+    div.querySelector('.rm').addEventListener('click', () => div.remove());
+  }
+
+  function collectFights() {
+    const rows = document.querySelectorAll('#fights-container .fight-row');
+    const fights = [];
+    for (const row of rows) {
+      const a = row.querySelector('.fight-a').value;
+      const b = row.querySelector('.fight-b').value;
+      const t = row.querySelector('.fight-title').value.trim();
+      if (!a && !b && !t) continue;          // fila vacia -> ignorar
+      if (!a || !b) return { error: 'Cada enfrentamiento requiere dos peleadores.' };
+      if (a === b) return { error: 'Un enfrentamiento no puede ser del mismo peleador.' };
+      fights.push({ peleador_a: parseInt(a), peleador_b: parseInt(b), titulo: t });
+    }
+    // valida peleadores repetidos dentro de la misma cartelera (opcional pero recomendado)
+    const seen = new Set();
+    for (const f of fights) {
+      for (const id of [f.peleador_a, f.peleador_b]) {
+        if (seen.has(id)) {
+          return { error: 'Un mismo peleador no puede aparecer en dos enfrentamientos del mismo evento.' };
+        }
+        seen.add(id);
+      }
+    }
+    // asignar orden
+    fights.forEach((f, idx) => f.orden = idx + 1);
+    return { fights };
+  }
+
   async function loadMisEventos() {
     const grid = document.getElementById('events-grid');
     const res  = await apiFetch('/api/mis-eventos/');
-    const events = res.events || [];
+    const events = Array.isArray(res) ? res : (res.results || res.events || []);
 
     document.getElementById('eventos-count').textContent =
       `${events.length} evento${events.length !== 1 ? 's' : ''} creado${events.length !== 1 ? 's' : ''}`;
 
-    const totalRegistros = events.reduce((acc, e) => acc + (e.total_registros || 0), 0);
-    document.getElementById('stat-total').textContent = events.length;
+    const totalRegistros = events.reduce((a, e) => a + (e.total_registros || 0), 0);
+    const totalPeleas    = events.reduce((a, e) => a + ((e.enfrentamientos || []).length), 0);
+    document.getElementById('stat-total').textContent      = events.length;
     document.getElementById('stat-asistentes').textContent = totalRegistros;
+    document.getElementById('stat-peleas').textContent     = totalPeleas;
     document.getElementById('stats-row').style.display = 'grid';
 
     if (events.length === 0) {
       grid.innerHTML = `
         <div class="empty-state" style="grid-column:1/-1">
-          <div class="icon">🥊</div>
+          <div class="icon">*</div>
           <p>Aun no has creado ningun evento.</p>
-          <p class="mt-1">¡Crea el primero con el boton de arriba!</p>
+          <p class="mt-1">Crea el primero con el boton de arriba.</p>
         </div>`;
       return;
     }
 
-    grid.innerHTML = events.map(e => `
+    grid.innerHTML = events.map(e => {
+      const fights = e.enfrentamientos || [];
+      const fightHtml = fights.length === 0
+        ? '<span style="color:var(--muted)">Sin enfrentamientos agregados.</span>'
+        : fights.map(f => `
+            <div class="fight-item">
+              <strong>${f.titulo || 'Pelea ' + f.orden}</strong>:
+              ${f.peleador_a_info.username} vs ${f.peleador_b_info.username}
+            </div>`).join('');
+      const fecha = e.fecha_formateada || e.fecha;
+      return `
       <div class="event-card">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <h3>${e.titulo}</h3>
           <span class="badge badge-${e.estado}">${e.estado}</span>
         </div>
         <p style="font-size:.88rem;color:var(--muted);line-height:1.5">
-          ${e.descripcion.substring(0,100)}${e.descripcion.length > 100 ? '…' : ''}
+          ${(e.descripcion || '').substring(0,100)}${(e.descripcion || '').length > 100 ? '...' : ''}
         </p>
         <div class="meta">
-          <span>📅 ${e.fecha}</span>
-          <span>📍 ${e.ubicacion}</span>
-          <span>👥 ${e.total_registros} registrado${e.total_registros !== 1 ? 's' : ''}</span>
+          <span>Fecha: ${fecha}</span>
+          <span>Lugar: ${e.ubicacion}</span>
+          <span>Registros: ${e.total_registros || 0}</span>
+        </div>
+        <div class="event-fights-mini">
+          <strong>Cartelera (${fights.length}):</strong>
+          ${fightHtml}
         </div>
         <div class="actions">
           <a href="/events/${e.id}/" class="btn btn-outline btn-sm">Ver detalle</a>
           <button class="btn btn-danger btn-sm" onclick="eliminarEvento(${e.id}, this)">Eliminar</button>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   }
 
   async function eliminarEvento(id, btn) {
-    if (!confirm('¿Seguro que deseas eliminar este evento?')) return;
+    if (!confirm('Seguro que deseas eliminar este evento?')) return;
     btn.disabled = true;
     const res = await apiFetch(`/api/events/${id}/`, 'DELETE');
-    if (res.ok) {
+    // DRF responde 204 sin cuerpo en DELETE -> no hay res.ok, asumimos exito
+    if (!res || res.ok || res.status === undefined) {
       showToast('Evento eliminado', 'success');
       loadMisEventos();
     } else {
-      showToast(res.error || 'Error al eliminar');
+      showToast(res.error || res.detail || 'Error al eliminar');
       btn.disabled = false;
     }
   }
@@ -199,21 +370,32 @@
     const res    = await apiFetch('/api/check-in/', 'POST', { codigo_qr: codigo });
     const result = document.getElementById('checkin-result');
     if (res.ok) {
-      result.textContent = `✅ Check-in: ${res.usuario} → ${res.evento}`;
+      result.textContent = `OK: ${res.usuario} -> ${res.evento}`;
       result.style.color = '#4ade80';
       document.getElementById('qr-input').value = '';
       showToast(`Check-in realizado: ${res.usuario}`, 'success');
     } else {
-      result.textContent = `❌ ${res.error}`;
+      result.textContent = `ERR: ${res.detail || res.error}`;
       result.style.color = 'var(--red)';
     }
   });
 
   const modal = document.getElementById('modal');
-  document.getElementById('btn-open-modal').addEventListener('click',  () => modal.classList.add('open'));
-  document.getElementById('btn-close-modal').addEventListener('click', () => modal.classList.remove('open'));
-  document.getElementById('btn-cancel').addEventListener('click',      () => modal.classList.remove('open'));
-  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+  async function openModal() {
+    await loadFighters();
+    document.getElementById('fights-container').innerHTML = '';
+    fightRowId = 0;
+    addFightRow();        // siempre al menos una fila
+    modal.classList.add('open');
+  }
+  function closeModal() { modal.classList.remove('open'); }
+
+  document.getElementById('btn-open-modal').addEventListener('click',  openModal);
+  document.getElementById('btn-close-modal').addEventListener('click', closeModal);
+  document.getElementById('btn-cancel').addEventListener('click',      closeModal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+  document.getElementById('btn-add-fight').addEventListener('click', () => addFightRow());
 
   document.getElementById('btn-crear').addEventListener('click', async () => {
     const titulo      = document.getElementById('ev-titulo').value.trim();
@@ -226,16 +408,28 @@
       return;
     }
 
-    const res = await apiFetch('/api/events/', 'POST', { titulo, descripcion, fecha, ubicacion });
-    if (res.ok) {
+    const result = collectFights();
+    if (result.error) { showToast(result.error); return; }
+
+    const payload = {
+      titulo, descripcion, fecha, ubicacion,
+      enfrentamientos_input: result.fights,
+    };
+    const res = await apiFetch('/api/events/', 'POST', payload);
+    if (res && (res.id || res.ok)) {
       showToast('Evento creado correctamente', 'success');
-      modal.classList.remove('open');
+      closeModal();
       ['ev-titulo','ev-desc','ev-fecha','ev-ubicacion'].forEach(id => {
         document.getElementById(id).value = '';
       });
+      document.getElementById('fights-container').innerHTML = '';
       loadMisEventos();
     } else {
-      showToast(res.error || 'Error al crear evento');
+      const msg = res?.detail
+        || (res?.enfrentamientos_input && JSON.stringify(res.enfrentamientos_input))
+        || res?.error
+        || 'Error al crear evento';
+      showToast(msg);
     }
   });
 
